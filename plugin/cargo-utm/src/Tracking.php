@@ -4,6 +4,7 @@ namespace CargoUTM;
 
 final class Tracking {
     public const PRESETS = [
+        'partner_site'=>['label'=>'Сайт','source'=>'','medium'=>'referral'],
         'yandex'=>['label'=>'Яндекс Директ','source'=>'yandex','medium'=>'cpc','key'=>'roistat','template'=>'direct[ID]_{source_type}_{banner_id}_{keyword}'],
         'vk'=>['label'=>'VK Ads','source'=>'vk.ads','medium'=>'cpc','key'=>'rs','template'=>'vkads[ID]_{{banner_id}}_{{search_phrase}}'],
         'avito'=>['label'=>'Avito Ads','source'=>'avito.ads','medium'=>'cpc','key'=>'roistat','template'=>'avitoads[ID]_{campaign_id}_{adgroup_id}_{ad_id}'],

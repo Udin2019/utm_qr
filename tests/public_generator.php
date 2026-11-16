@@ -18,6 +18,7 @@ if (isset($argv[1])) {
                 ['template_code'=>'yandex','version'=>2,'settings_json'=>json_encode(CargoUTM\Tracking::PRESETS['yandex']+['internal'=>'hidden'])],
                 ['template_code'=>'yandex','version'=>1,'settings_json'=>'{}'],
                 ['template_code'=>'exhibition','version'=>1,'settings_json'=>'{}'],
+                ['template_code'=>'partner_site','version'=>1,'settings_json'=>json_encode(CargoUTM\Tracking::PRESETS['partner_site'])],
             ];
             throw new RuntimeException('Unexpected database read');
         }
@@ -32,6 +33,7 @@ if (isset($argv[1])) {
 }
 $input=['unit_id'=>7,'campaign_name'=>'Выставка','campaign_year'=>2026,'type'=>'online','url'=>'https://fuel.cargo.example/cards?utm_source=old#form','utm_source'=>'yandex','utm_medium'=>'cpc'];
 $cases=[['label'=>'catalog','op'=>'bootstrap','status'=>200],['label'=>'preview','op'=>'preview','status'=>200,'input'=>$input],['label'=>'custom code and macros','op'=>'preview','status'=>200,'input'=>$input+['campaign_code'=>'banner_25','preset'=>'yandex','use_roistat'=>true,'roistat_value'=>'123']]];
+$cases[]=['label'=>'partner referral','op'=>'preview','status'=>200,'input'=>array_replace($input,['preset'=>'partner_site','utm_source'=>'partner.ru','utm_medium'=>'referral'])];
 foreach (['registry','record','decode','issue','campaign','change','slug','unknown'] as $op) $cases[]=['label'=>'private '.$op,'op'=>$op,'status'=>403];
 $cases[]=['label'=>'GET','op'=>'bootstrap','method'=>'GET','status'=>405];
 $cases[]=['label'=>'nonce','op'=>'bootstrap','nonce'=>'bad','status'=>403];
@@ -52,6 +54,7 @@ foreach ($cases as $case) {
         foreach (['placements','audit','authors','downloads','hits'] as $key) if (isset($data[$key])) throw new RuntimeException('Private data exposed');
     } else {
         if (!$data['provisional'] || !$data['campaignIdPending'] || $data['tags']['utm_id']!=='' || str_contains($data['url'],'utm_id=')) throw new RuntimeException('Permanent campaign ID exposed');
+        if ($case['label']==='partner referral' && ($data['tags']['utm_source']!=='partner.ru' || $data['tags']['utm_medium']!=='referral')) throw new RuntimeException('Partner referral tags');
         if ($data['removed']!==['utm_source']) throw new RuntimeException('Tracking replacement');
         if ($case['label']==='custom code and macros' && ($data['tags']['utm_campaign']!=='banner_25' || !str_contains($data['url'],'roistat=direct123_{source_type}_{banner_id}_{keyword}'))) throw new RuntimeException('Custom code/macros');
     }

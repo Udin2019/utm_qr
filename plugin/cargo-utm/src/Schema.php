@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace CargoUTM;
 final class Schema {
-    public const VERSION=2;
+    public const VERSION=3;
     public static function migrate(): void {
         global $wpdb;
         require_once ABSPATH.'wp-admin/includes/upgrade.php';
@@ -28,6 +28,7 @@ final class Schema {
         $columns=$wpdb->get_col("SHOW COLUMNS FROM {$p}placements");
         if (!in_array('tracking_json',$columns,true)) throw new \RuntimeException('Не создан снимок tracking_json.');
         self::uiDefaults();
+        self::partnerSiteDefault();
         update_option('cargo_utm_schema_version',self::VERSION,false);
         self::roles();
     }
@@ -42,6 +43,7 @@ final class Schema {
             if ((int)get_option('cargo_utm_ui_defaults_version')>=2) return;
             $s->transaction(function() use ($wpdb,$s) {
                 $defaults=Tracking::PRESETS;
+                unset($defaults['partner_site']); // Added separately without republishing older channels.
                 $defaults['print_media']=['label'=>Rules::TYPES['print_media'],'required'=>Rules::REQUIRED['print_media'],'visible'=>Rules::VISIBLE['print_media']];
                 foreach ($defaults as $code=>$settings) {
                     $previous=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.$s->table('template_versions').' WHERE template_code=%s ORDER BY version DESC LIMIT 1',$code),ARRAY_A);
@@ -61,6 +63,24 @@ final class Schema {
                     }
                 }
                 update_option('cargo_utm_ui_defaults_version',2,false);
+            });
+        } finally { $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock)); }
+    }
+    /** Add only the partner channel; preserve all existing template versions. */
+    public static function partnerSiteDefault(): void {
+        global $wpdb;
+        if ((int)get_option('cargo_utm_partner_site_default')>=1) return;
+        $s=new Store(); $lock=$wpdb->prefix.'cargo_partner_site';
+        if ((int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,10)',$lock))!==1) throw new \RuntimeException('Добавление канала занято.');
+        try {
+            if ((int)get_option('cargo_utm_partner_site_default')>=1) return;
+            $s->transaction(function() use ($wpdb,$s) {
+                $existing=$wpdb->get_var($wpdb->prepare('SELECT id FROM '.$s->table('template_versions').' WHERE template_code=%s LIMIT 1','partner_site'));
+                if (!$existing) {
+                    $id=$s->insert('template_versions',['template_code'=>'partner_site','version'=>1,'settings_json'=>wp_json_encode(Tracking::PRESETS['partner_site']),'created_at'=>gmdate('Y-m-d H:i:s')]);
+                    $s->audit(null,'template_publish',[],['id'=>$id,'code'=>'partner_site','version'=>1,'migration'=>3]);
+                }
+                update_option('cargo_utm_partner_site_default',1,false);
             });
         } finally { $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock)); }
     }
@@ -84,5 +104,6 @@ final class Schema {
             $s->audit(null,'seed',[],['staging'=>true]);
         });
         self::uiDefaults();
+        self::partnerSiteDefault();
     }
 }

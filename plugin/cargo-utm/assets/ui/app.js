@@ -72,6 +72,18 @@
     hint.textContent = preset?.template ? `${preset.key}=${preset.template} · Площадка подставит макросы. Реальная интеграция требует проверки в рекламном кабинете.` : 'Значение метки или готовый параметр roistat=… / rs=…';
     hint.hidden = !enabled;
   }
+  function channelFields(apply = false) {
+    const select = $('field-preset'); if (!select) return;
+    const preset = state.data.presets[select.value];
+    const source = $('field-utm_source'); const partner = select.value === 'partner_site';
+    source.closest('label').querySelector('span').textContent = partner ? 'Название сайта партнёра · utm_source *' : 'Источник · utm_source *';
+    source.placeholder = partner ? 'partner.ru — латиница, без https://' : '';
+    if (apply && preset) {
+      source.value = preset.source;
+      $('field-utm_medium').value = preset.medium;
+      $('field-roistat_value').value = preset.default || '';
+    }
+  }
   function renderFields() {
     const offline = state.mode === 'offline'; const type = offline ? state.carrier : 'online';
     fieldArea.replaceChildren();
@@ -104,7 +116,7 @@
       field('utm_term', 'Ключевая фраза · utm_term', 'text', false, values.utm_term || '');
       field('use_roistat', 'Добавить метку Roistat', 'checkbox', false, values.use_roistat || false, true);
       const value = field('roistat_value', 'Метка Roistat', 'text', false, values.roistat_value || '', true);
-      const hint = node('small', '', 'tracking-hint'); hint.id = 'roistat-hint'; value.closest('label').append(hint); trackingField();
+      const hint = node('small', '', 'tracking-hint'); hint.id = 'roistat-hint'; value.closest('label').append(hint); channelFields(); trackingField();
     }
     const note = state.carrier === 'transport' ? 'Выпускайте отдельный код на каждую машину для раздельной статистики. Считывание на ходу проверяется только в безопасном контролируемом сценарии.' : ['outdoor', 'print_media'].includes(state.carrier) ? 'До тиража проверьте SVG в макете и QR на реальном материале с iOS и Android.' : '';
     $('carrier-note').textContent = offline ? note : ''; $('carrier-note').hidden = !offline || !note;
@@ -319,8 +331,7 @@
     form.addEventListener('input', event => { if (event.target === $('business')) return; rememberFields(); if (event.target.name === 'use_roistat') trackingField(); dirty(); });
     form.addEventListener('change', event => {
       if (event.target.name !== 'preset') return;
-      const preset = state.data.presets[event.target.value];
-      if (preset) { $('field-utm_source').value = preset.source; $('field-utm_medium').value = preset.medium; $('field-roistat_value').value = preset.default || ''; }
+      channelFields(true);
       rememberFields(); trackingField(); dirty();
     });
     form.addEventListener('submit', save);
