@@ -67,6 +67,7 @@ foreach ($cases as [$case,$expected]) {
     $out=stream_get_contents($pipes[1]); $error=stream_get_contents($pipes[2]); fclose($pipes[1]); fclose($pipes[2]); $code=proc_close($p);
     if ($expected['html']??false) {
         if ($code!==0 || !str_starts_with($out,'<!doctype html>') || !str_contains($out,'class="cargo-standalone"')) throw new RuntimeException('Standalone shell: '.$error);
+        if (!str_contains($out,'id="generator-home" href="https://utmqr.kit-rb.com/"')) throw new RuntimeException('Generator root link');
         preg_match('/<script type="application\/json" id="cargo-config">(.*?)<\/script>/s',$out,$matches);
         $config=json_decode($matches[1]??'',true,32,JSON_THROW_ON_ERROR);
         if ($config['isGuest']!==$expected['guest'] || str_contains($config['links']['logout'],'&amp;')) throw new RuntimeException('Guest config/logout');
