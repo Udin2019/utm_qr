@@ -23,11 +23,20 @@ final class SitePolicy {
         // Crawlers must be able to read noindex headers on public responses.
         return "User-agent: *\nDisallow:\n";
     }
+    public function publicHeaders(): array {
+        return [
+            'Content-Security-Policy'=>"default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+            'X-Frame-Options'=>'DENY',
+            'X-Content-Type-Options'=>'nosniff',
+            'Permissions-Policy'=>'camera=(), microphone=(), geolocation=()',
+        ];
+    }
     public function entry(): void {
         if (is_feed() || is_robots() || (!is_front_page() && !is_home())) return;
         nocache_headers();
         $guest=!is_user_logged_in();
         if (!$guest && !current_user_can('cargo_view')) wp_die('Нет доступа к сервису. Обратитесь к администратору.','Доступ запрещён',['response'=>403]);
+        if ($guest) foreach ($this->publicHeaders() as $name=>$value) header($name.': '.$value);
         show_admin_bar(false);
         $base=dirname(__DIR__).'/cargo-utm.php';
         wp_enqueue_style('cargo-workspace',plugins_url('assets/ui/app.css',$base),[],(string)filemtime(dirname(__DIR__).'/assets/ui/app.css'));

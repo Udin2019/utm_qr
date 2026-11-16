@@ -54,7 +54,7 @@
     if (type !== 'select') input.type = type;
     input.name = name; input.id = 'field-' + name; input.required = required;
     if (type === 'checkbox') { input.checked = Boolean(value) && value !== '0'; wrapper.classList.add('check-field'); wrapper.append(input, title); }
-    else { input.value = value; input.maxLength = name === 'roistat_value' ? 280 : 250; wrapper.append(title, input); }
+    else { input.value = value; input.maxLength = ({ roistat_value: 280, utm_source: 80, utm_medium: 80, utm_content: 160, utm_term: 160 })[name] || 250; wrapper.append(title, input); }
     fieldArea.append(wrapper); return input;
   }
   function rememberFields() {
@@ -296,17 +296,35 @@
       $('qr-empty').textContent = 'Рабочий QR появится после входа и сохранения';
     }
   }
+  function draftValues(raw, fields) {
+    const clean = {};
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return clean;
+    for (const [key, max] of Object.entries(fields)) {
+      if (!Object.hasOwn(raw, key)) continue;
+      const value = raw[key];
+      if (max === 0) {
+        if ([true, false, 0, 1, '0', '1', ''].includes(value)) clean[key] = value === true || value === 1 || value === '1';
+      } else if (typeof value === 'string' && [...value].length <= max && !/[\x00-\x1f\x7f]/.test(value)) clean[key] = value;
+    }
+    return clean;
+  }
   function restoreDraft() {
     let draft;
-    try { draft = JSON.parse(sessionStorage.getItem(draftKey) || 'null'); } catch { return; }
-    if (!draft || !Number.isFinite(draft.time) || draft.time > Date.now() || Date.now() - draft.time > 86400000 || !draft.input || typeof draft.input !== 'object') return;
-    const input = draft.input;
+    try { const raw = sessionStorage.getItem(draftKey) || 'null'; if (raw.length > 32768) return; draft = JSON.parse(raw); } catch { return; }
+    if (!draft || !Number.isFinite(draft.time) || draft.time > Date.now() || Date.now() - draft.time > 86400000 || !draft.input || typeof draft.input !== 'object' || Array.isArray(draft.input)) return;
+    const input = draftValues(draft.input, { url: 2048, place_slug: 80, brand_id: 80, campaign_name: 200, campaign_code: 120 });
+    input.unit_id = typeof draft.input.unit_id === 'string' || Number.isSafeInteger(draft.input.unit_id) ? String(draft.input.unit_id) : '';
+    const year = typeof draft.input.campaign_year === 'string' || Number.isSafeInteger(draft.input.campaign_year) ? String(draft.input.campaign_year) : '';
+    input.campaign_year = /^[0-9]{4}$/.test(year) ? year : '';
     if ([...$('business').options].some(o => o.value === String(input.unit_id))) $('business').value = String(input.unit_id);
     selectUnit();
     if (['online', 'offline'].includes(draft.mode)) state.mode = draft.mode;
-    if (draft.carrier !== 'online' && state.data.visible[draft.carrier]) state.carrier = draft.carrier;
-    if (draft.details && typeof draft.details === 'object') state.details = draft.details;
-    if (draft.online && typeof draft.online === 'object') state.online = draft.online;
+    if (typeof draft.carrier === 'string' && draft.carrier !== 'online' && Object.hasOwn(state.data.visible, draft.carrier)) state.carrier = draft.carrier;
+    state.details = {};
+    for (const [type, fields] of Object.entries(state.data.visible)) {
+      if (type !== 'online') state.details[type] = draftValues(draft.details?.[type], Object.fromEntries(fields.map(key => [key, key === 'moving' ? 0 : 250])));
+    }
+    state.online = draftValues(draft.online, { preset: 40, utm_source: 80, utm_medium: 80, utm_content: 160, utm_term: 160, use_roistat: 0, roistat_value: 280 });
     $('destination').value = input.url || ''; $('place-slug').value = input.place_slug || '';
     if (input.brand_id === 'corporate') {
       const common = state.data.brands.find(b => b.unit_id === null);

@@ -13,15 +13,30 @@ final class PublicGenerator {
         // The URL action is mandatory so the origin rate limiter cannot be
         // bypassed by moving the action solely into the POST body.
         if (($_GET['action']??'')!=='cargo_public_generator' || ($_SERVER['QUERY_STRING']??'')!=='action=cargo_public_generator') wp_send_json_error(['message'=>'Неверный маршрут.'],400);
+        nocache_headers();
+        header('X-Content-Type-Options: nosniff');
+        $length=$_SERVER['CONTENT_LENGTH']??'0';
+        if (!is_string($length) || !ctype_digit($length)) wp_send_json_error(['message'=>'Некорректный размер запроса.'],400);
+        if (strlen($length)>8 || (int)$length>PublicInput::MAX_REQUEST_BYTES) wp_send_json_error(['message'=>'Слишком большой запрос.'],413);
+        $contentType=strtolower(trim(explode(';',$_SERVER['CONTENT_TYPE']??'application/x-www-form-urlencoded')[0]));
+        if ($contentType!=='application/x-www-form-urlencoded') wp_send_json_error(['message'=>'Неподдерживаемый формат запроса.'],415);
+        $origin=$_SERVER['HTTP_ORIGIN']??null;
+        $expectedOrigin=rtrim(Config::env('CARGO_PUBLIC_UTM_URL','https://'.Config::hosts()[0]),'/');
+        if (($_SERVER['HTTP_SEC_FETCH_SITE']??'')==='cross-site' || ($origin!==null && $origin!==$expectedOrigin)) wp_send_json_error(['message'=>'Запрос с другого сайта запрещён.'],403);
+        if (!is_string($_POST['nonce']??null) || strlen($_POST['nonce'])>128) wp_send_json_error(['message'=>'Обновите страницу.'],403);
         check_ajax_referer('cargo_public_generator','nonce');
-        $op=sanitize_key($_POST['op']??'');
-        if (!in_array($op,['bootstrap','preview'],true)) wp_send_json_error(['message'=>'Для этой операции войдите в сервис.'],403);
+        $op=$_POST['op']??null;
+        if (!is_string($op) || !in_array($op,['bootstrap','preview'],true)) wp_send_json_error(['message'=>'Для этой операции войдите в сервис.'],403);
+        $payload=$_POST['payload']??'{}';
+        if (!is_string($payload)) wp_send_json_error(['message'=>'Некорректная форма.'],400);
+        if (strlen($payload)>PublicInput::MAX_JSON_BYTES) wp_send_json_error(['message'=>'Слишком большая форма.'],413);
         try {
-            $in=json_decode(wp_unslash((string)($_POST['payload']??'{}')),true,32,JSON_THROW_ON_ERROR);
-            if (!is_array($in)) throw new \InvalidArgumentException('Некорректная форма.');
-            wp_send_json_success($op==='bootstrap'?$this->catalog():$this->preview($in));
+            $object=json_decode(wp_unslash($payload),false,16,JSON_THROW_ON_ERROR);
+            if (!$object instanceof \stdClass) throw new \InvalidArgumentException('Форма должна быть объектом.');
+            if ($op==='bootstrap' && get_object_vars($object)!==[]) throw new \InvalidArgumentException('Каталог не принимает поля формы.');
+            wp_send_json_success($op==='bootstrap'?$this->catalog():$this->preview(PublicInput::preview($object)));
         } catch (\JsonException|\InvalidArgumentException $e) {
-            wp_send_json_error(['message'=>$e->getMessage()],400);
+            wp_send_json_error(['message'=>$e instanceof \JsonException?'Некорректный JSON формы.':$e->getMessage()],400);
         } catch (\Throwable $e) {
             error_log('cargo_public_preview failed');
             wp_send_json_error(['message'=>'Предпросмотр временно недоступен.'],503);

@@ -46,6 +46,9 @@ if (isset($argv[1])) {
 $policy=new SitePolicy();
 $headers=$policy->headers(['Content-Type'=>'text/html']);
 if ($headers['X-Robots-Tag']!=='noindex, nofollow, noarchive' || $headers['Content-Type']!=='text/html') throw new RuntimeException('Response headers');
+$publicHeaders=$policy->publicHeaders();
+foreach (["script-src 'self';","connect-src 'self';","object-src 'none';","base-uri 'none';","frame-ancestors 'none';","form-action 'self'"] as $directive) if (!str_contains($publicHeaders['Content-Security-Policy'],$directive)) throw new RuntimeException('Missing CSP directive');
+if ($publicHeaders['X-Frame-Options']!=='DENY' || $publicHeaders['X-Content-Type-Options']!=='nosniff') throw new RuntimeException('Security headers');
 $robots=$policy->robots(['index'=>true,'follow'=>true,'max-image-preview'=>'large']);
 if (isset($robots['index'],$robots['follow']) || empty($robots['noindex']) || empty($robots['nofollow'])) throw new RuntimeException('Robots meta');
 if ($policy->robotsTxt('Sitemap: old',true)!=="User-agent: *\nDisallow:\n") throw new RuntimeException('Robots must allow reading noindex');

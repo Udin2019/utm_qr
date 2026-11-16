@@ -18,7 +18,7 @@ function browser(guest) {
   const ctx = {
     URL, Date, Number, JSON, String,
     config: { isGuest: guest, links: { home: 'https://utmqr.kit-rb.com/', login: 'https://utmqr.kit-rb.com/wp-login.php?redirect_to=old' } },
-    state: { data: { visible: { exhibition: [], outdoor: [], online: [] }, brands: [{ id: guest ? 'corporate' : 42, unit_id: null }] }, mode: 'offline', carrier: 'exhibition', details: {}, online: {} },
+    state: { data: { visible: { exhibition: [], outdoor: ['city', 'object_code'], online: [] }, brands: [{ id: guest ? 'corporate' : 42, unit_id: null }] }, mode: 'offline', carrier: 'exhibition', details: {}, online: {} },
     draftKey: 'cargo-utm-public-draft.v1',
     $: id => elements[id],
     sessionStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
@@ -28,7 +28,7 @@ function browser(guest) {
     payload: () => ({ unit_id: '7', brand_id: 'corporate', url: 'https://fuel.cargo.example/', place_slug: 'banner', campaign_name: 'Выставка', campaign_year: '2026', campaign_code: 'banner_25' }),
   };
   vm.createContext(ctx);
-  vm.runInContext(productionFunction('authenticate') + '\n' + productionFunction('restoreDraft'), ctx);
+  vm.runInContext(productionFunction('authenticate') + '\n' + productionFunction('draftValues') + '\n' + productionFunction('restoreDraft'), ctx);
   return { ctx, storage, elements };
 }
 const guest = browser(true);
@@ -62,4 +62,19 @@ offline.ctx.restoreDraft();
 assert.equal(offline.ctx.state.carrier, 'outdoor');
 assert.equal(offline.ctx.state.details.outdoor.city, 'Москва');
 assert.equal(offline.elements['place-slug'].value, 'street');
+const tampered = browser(false);
+tampered.storage.set(tampered.ctx.draftKey, '{"time":' + Date.now() + ',"input":{"url":["javascript:alert(1)"],"campaign_name":{"bad":1}},"carrier":"__proto__","details":{"__proto__":{"polluted":true},"outdoor":{"city":{"nested":1},"object_code":"A12"}},"online":{"__proto__":{"polluted":true},"utm_source":{"nested":1},"utm_medium":"referral"}}');
+tampered.ctx.restoreDraft();
+assert.equal(tampered.ctx.state.carrier, 'exhibition');
+assert.equal(tampered.elements.destination.value, '');
+assert.equal(tampered.ctx.state.online.utm_source, undefined);
+assert.equal(tampered.ctx.state.online.utm_medium, 'referral');
+assert.equal(tampered.ctx.state.details.outdoor.city, undefined);
+assert.equal(tampered.ctx.state.details.outdoor.object_code, 'A12');
+assert.equal(Object.hasOwn(tampered.ctx.state.details, '__proto__'), false);
+assert.equal({}.polluted, undefined);
+const objects = browser(true);
+objects.storage.set(objects.ctx.draftKey, JSON.stringify({ time: Date.now(), input: { campaign_year: { toString: null }, unit_id: { toString: null } }, carrier: { toString: null } }));
+assert.doesNotThrow(() => objects.ctx.restoreDraft());
+assert.equal(objects.ctx.state.carrier, 'exhibition');
 console.log('PASS: guest login target, online/offline draft restoration, brand/code preservation, invalid/expired drafts');

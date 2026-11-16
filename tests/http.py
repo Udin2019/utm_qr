@@ -43,6 +43,8 @@ def counter(row):
 status, headers = request(internal, '/')
 assert status == 200 and 'text/html' in headers.get('content-type', ''), 'Root must serve the public generator'
 assert 'noindex' in headers.get('x-robots-tag', ''), 'Root must carry noindex'
+assert "script-src 'self';" in headers.get('content-security-policy', ''), 'Public CSP missing'
+assert headers.get('x-frame-options', '').upper() == 'DENY', 'Public framing protection missing'
 status, body = public_body('/')
 assert status == 200 and 'class="cargo-standalone"' in body, 'Standalone shell missing'
 match = re.search(r'<script type="application/json" id="cargo-config">(.*?)</script>', body, re.S)
@@ -60,6 +62,10 @@ for op in ('issue', 'registry', 'record', 'decode', 'campaign', 'change'):
     assert public_body(public_path, dict(fields, op=op))[0] == 403, f'Guest operation exposed: {op}'
 assert request(internal, public_path)[0] == 405, 'Public API must require POST'
 assert public_body(public_path, dict(fields, nonce='invalid'))[0] == 403, 'Public API nonce missing'
+for payload in ('[]', '{"unexpected":"field"}'):
+    assert public_body(public_path, dict(fields, op='preview', payload=payload))[0] == 400, 'Malformed public input accepted'
+assert public_body(public_path, dict(fields, op='preview', payload=' ' * 16385))[0] == 413, 'Public JSON limit missing'
+
 
 status, headers = request(internal, '/robots.txt', 'GET')
 assert status == 200 and 'noindex' in headers.get('x-robots-tag', ''), 'Robots endpoint/noindex missing'
