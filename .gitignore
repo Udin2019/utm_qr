@@ -26,7 +26,7 @@ __pycache__/
 *.sqlite3
 *.db
 
-# Local reference archives/backups; implementation plans remain versioned
+# Local reference archives/backups
 *.zip
 *.tar
 *.tar.gz
@@ -34,4 +34,23 @@ __pycache__/
 *.rar
 *.bak
 /tmp/*
-!/tmp/plans/
+
+# Private operational notes and local plans
+/MEMORY.md
+/PROGRESS.md
+
+# SSH credentials and local authentication files
+.ssh/
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+id_ed25519_*
+.netrc
+.git-credentials
+*.ppk
+*.p8
+*.p12
+*.pfx
+.envrc
+.htpasswd
