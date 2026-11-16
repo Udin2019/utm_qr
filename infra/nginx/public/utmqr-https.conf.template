@@ -1,0 +1,46 @@
+# Managed by cargo_utm_qr public-domain installer.
+log_format cargo_public_safe '$time_iso8601 status=$status bytes=$body_bytes_sent duration=$request_time';
+server {
+    listen 80;
+    listen [::]:80;
+    server_name utmqr.kit-rb.com;
+    add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+    access_log /var/log/nginx/cargo-public.log cargo_public_safe;
+    error_log /dev/null crit;
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/cargo-utmqr-acme;
+        try_files $uri =404;
+    }
+    location / { return 308 https://utmqr.kit-rb.com$request_uri; }
+}
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name utmqr.kit-rb.com;
+    add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+    ssl_certificate /etc/letsencrypt/live/utmqr.kit-rb.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/utmqr.kit-rb.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    access_log /var/log/nginx/cargo-public.log cargo_public_safe;
+    error_log /dev/null crit;
+    client_max_body_size 2m;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy same-origin always;
+    location / {
+        proxy_pass https://127.0.0.1:@@ORIGIN_PORT@@;
+        proxy_ssl_server_name on;
+        proxy_ssl_name @@ORIGIN_HOST@@;
+        proxy_ssl_verify on;
+        proxy_ssl_trusted_certificate /etc/nginx/cargo-origin-ca.crt;
+        proxy_set_header Host @@ORIGIN_HOST@@;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Authorization $http_authorization;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_redirect off;
+        proxy_cache off;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+    }
+}

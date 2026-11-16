@@ -1,0 +1,7 @@
+.env
+secrets
+.runtime
+backups
+.git
+tmp
+plugin/cargo-utm/vendor

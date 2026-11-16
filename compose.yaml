@@ -1,0 +1,110 @@
+name: cargo-utm
+x-app-env: &app-env
+  CARGO_ENV: ${CARGO_ENV:-staging}
+  CARGO_PUBLIC_UTM_URL: ${CARGO_PUBLIC_UTM_URL:-}
+  CARGO_UTM_HOST: ${CARGO_UTM_HOST:-utm.cargo.test}
+  CARGO_GO_HOST: ${CARGO_GO_HOST:-go.cargo.test}
+  CARGO_ALLOWED_HOSTS: ${CARGO_ALLOWED_HOSTS:-fuel.cargo.example}
+  CARGO_TABLE_PREFIX: ${CARGO_TABLE_PREFIX:-wp_}
+  CARGO_DB_HOST: db
+  CARGO_DB_NAME: ${CARGO_DB_NAME:-cargo_staging}
+services:
+  db:
+    image: ${MARIADB_IMAGE:-mariadb:10.11}
+    environment:
+      MARIADB_DATABASE: ${CARGO_DB_NAME:-cargo_staging}
+      MARIADB_USER: ${CARGO_DB_USER:-cargo_wp}
+      MARIADB_PASSWORD: ${CARGO_DB_PASSWORD:?Fill .env DB password}
+      MARIADB_ROOT_PASSWORD: ${CARGO_DB_ROOT_PASSWORD:?Fill .env root password}
+    volumes: [db:/var/lib/mysql]
+    healthcheck:
+      test: [CMD, healthcheck.sh, --connect, --innodb_initialized]
+      interval: 5s
+      retries: 30
+    networks: [backend]
+  wordpress:
+    build:
+      context: .
+      dockerfile: infra/php/wordpress.Dockerfile
+      args:
+        WORDPRESS_IMAGE: ${WORDPRESS_IMAGE:-wordpress:php8.3-fpm}
+    environment:
+      <<: *app-env
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: ${CARGO_DB_NAME:-cargo_staging}
+      WORDPRESS_DB_USER: ${CARGO_DB_USER:-cargo_wp}
+      WORDPRESS_DB_PASSWORD: ${CARGO_DB_PASSWORD:?Fill .env DB password}
+      WORDPRESS_TABLE_PREFIX: ${CARGO_TABLE_PREFIX:-wp_}
+      WORDPRESS_CONFIG_EXTRA: &wordpress-config-extra |
+        define('WP_HOME', getenv('CARGO_PUBLIC_UTM_URL') ?: ('https://' . getenv('CARGO_UTM_HOST')));
+        define('WP_SITEURL', WP_HOME);
+        define('FORCE_SSL_ADMIN', true);
+        define('DISALLOW_FILE_EDIT', true);
+        define('DISALLOW_FILE_MODS', true);
+        define('WP_ENVIRONMENT_TYPE', getenv('CARGO_ENV') === 'production' ? 'production' : 'staging');
+    volumes: [wordpress:/var/www/html]
+    depends_on:
+      db: {condition: service_healthy}
+    networks: [backend]
+  setup:
+    build:
+      context: .
+      dockerfile: infra/php/wordpress.Dockerfile
+      args:
+        WORDPRESS_IMAGE: ${WORDPRESS_IMAGE:-wordpress:php8.3-fpm}
+    entrypoint: [php, /opt/cargo/setup.php]
+    environment:
+      <<: *app-env
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: ${CARGO_DB_NAME:-cargo_staging}
+      WORDPRESS_DB_USER: ${CARGO_DB_USER:-cargo_wp}
+      WORDPRESS_DB_PASSWORD: ${CARGO_DB_PASSWORD:?Fill .env DB password}
+      WORDPRESS_TABLE_PREFIX: ${CARGO_TABLE_PREFIX:-wp_}
+      WORDPRESS_CONFIG_EXTRA: *wordpress-config-extra
+      CARGO_DB_USER: ${CARGO_DB_USER:-cargo_wp}
+      CARGO_DB_PASSWORD: ${CARGO_DB_PASSWORD:?Fill .env DB password}
+      CARGO_DB_ROOT_PASSWORD: ${CARGO_DB_ROOT_PASSWORD:?Fill .env root password}
+      CARGO_GO_DB_USER: ${CARGO_GO_DB_USER:-cargo_go}
+      CARGO_GO_DB_PASSWORD: ${CARGO_GO_DB_PASSWORD:?Fill .env go password}
+      CARGO_WP_ADMIN_USER: ${CARGO_WP_ADMIN_USER:-cargo_admin}
+      CARGO_WP_ADMIN_PASSWORD: ${CARGO_WP_ADMIN_PASSWORD:?Fill .env WP password}
+      CARGO_WP_ADMIN_EMAIL: ${CARGO_WP_ADMIN_EMAIL:-admin@cargo.test}
+    volumes: [wordpress:/var/www/html]
+    depends_on: [wordpress]
+    restart: 'no'
+    networks: [backend]
+  go:
+    build:
+      context: .
+      dockerfile: infra/php/go.Dockerfile
+    environment:
+      <<: *app-env
+      CARGO_GO_DB_USER: ${CARGO_GO_DB_USER:-cargo_go}
+      CARGO_GO_DB_PASSWORD: ${CARGO_GO_DB_PASSWORD:?Fill .env go password}
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on:
+      setup: {condition: service_completed_successfully}
+    networks: [backend]
+    security_opt: [no-new-privileges:true]
+  nginx:
+    image: ${NGINX_IMAGE:-nginx:stable-alpine}
+    environment:
+      CARGO_UTM_HOST: ${CARGO_UTM_HOST:-utm.cargo.test}
+      CARGO_GO_HOST: ${CARGO_GO_HOST:-go.cargo.test}
+      NGINX_ENVSUBST_FILTER: ^CARGO_
+    ports:
+      - ${CARGO_BIND:-127.0.0.1}:${CARGO_HTTP_PORT:-18080}:80
+      - ${CARGO_BIND:-127.0.0.1}:${CARGO_HTTPS_PORT:-18443}:443
+    volumes:
+      - wordpress:/var/www/html:ro
+      - ./infra/nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ${CARGO_TLS_CERT:-./secrets/tls.crt}:/run/cargo/tls.crt:ro
+      - ${CARGO_TLS_KEY:-./secrets/tls.key}:/run/cargo/tls.key:ro
+    depends_on: [wordpress, go]
+    networks: [backend]
+networks:
+  backend:
+volumes:
+  db:
+  wordpress:

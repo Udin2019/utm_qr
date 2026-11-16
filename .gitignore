@@ -1,0 +1,37 @@
+# Runtime settings and secrets
+.env
+.env.*
+!.env.example
+secrets/
+.runtime/
+backups/
+**/htpasswd
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+
+# Installed dependencies and caches
+**/vendor/
+**/node_modules/
+__pycache__/
+*.pyc
+*.log
+
+# Database data and dumps
+*.sql
+*.dump
+*.sqlite
+*.sqlite3
+*.db
+
+# Local reference archives/backups; implementation plans remain versioned
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.rar
+*.bak
+/tmp/*
+!/tmp/plans/

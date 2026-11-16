@@ -1,0 +1,16 @@
+{
+  "name": "cargonomica/cargo-utm",
+  "description": "Internal UTM registry and branded QR for WordPress",
+  "type": "wordpress-plugin",
+  "license": "proprietary",
+  "require": {
+    "php": "^8.3",
+    "ext-mbstring": "*",
+    "ext-intl": "*",
+    "ext-gd": "*",
+    "ext-pdo_mysql": "*",
+    "chillerlan/php-qrcode": "~6.0.1"
+  },
+  "autoload": {"psr-4": {"CargoUTM\\": "src/"}},
+  "config": {"sort-packages": true, "allow-plugins": false}
+}

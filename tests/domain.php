@@ -1,0 +1,81 @@
+<?php
+declare(strict_types=1);
+require __DIR__.'/../plugin/cargo-utm/src/Tracking.php';
+require __DIR__.'/../plugin/cargo-utm/src/UrlBuilder.php';
+require __DIR__.'/../plugin/cargo-utm/src/Rules.php';
+require __DIR__.'/../plugin/cargo-utm/src/Decoder.php';
+use CargoUTM\{UrlBuilder,Rules,Decoder};
+$tests=0;
+function same(mixed $want,mixed $got,string $label): void { global $tests; $tests++; if ($want!==$got) throw new RuntimeException($label.' expected '.var_export($want,true).' got '.var_export($got,true)); }
+function rejects(callable $fn,string $label): void { global $tests; $tests++; try {$fn();} catch (InvalidArgumentException $e) {return;} throw new RuntimeException('Should reject '.$label); }
+$b=new UrlBuilder(['fuel.cargo.example'],['utm.cargo.test','go.cargo.test']);
+$utm=['utm_source'=>'exhibition','utm_medium'=>'qr','utm_campaign'=>'cargo-fuel-2027-logistika-ekspo','utm_content'=>'entrance-a12-p-9f4c21d6a8be','utm_id'=>'cg-2d00e10f21344b80'];
+$expected='https://fuel.cargo.example/cards?product=diesel&utm_source=exhibition&utm_medium=qr&utm_campaign=cargo-fuel-2027-logistika-ekspo&utm_content=entrance-a12-p-9f4c21d6a8be&utm_id=cg-2d00e10f21344b80#request';
+same($expected,$b->build('https://fuel.cargo.example/cards?product=diesel#request',$utm)['url'],'acceptance fixture');
+$r=$b->build('https://fuel.cargo.example/путь?a=1&a=2&b=x%20y&UTM_Source=old&%75tm_medium=old&z=%2520#я',$utm);
+same(['UTM_Source','utm_medium'],$r['removed'],'replace case and encoded keys');
+same(true,str_contains($r['url'],'/%D0%BF%D1%83%D1%82%D1%8C?a=1&a=2&b=x%20y&z=%2520&'),'preserve duplicates order escapes');
+same(true,str_ends_with($r['url'],'#%D1%8F'),'fragment last');
+same(true,str_contains($b->build('https://fuel.cargo.example?x=a=b&blank=&flag',$utm+['utm_term'=>'обычный текст'])['url'],'x=a=b&blank=&flag&'),'split first equals');
+same(true,str_contains($b->build('https://fuel.cargo.example',array_replace($utm,['utm_term'=>'слово +']))['url'],'utm_term=%D1%81%D0%BB%D0%BE%D0%B2%D0%BE%20%2B'),'UTF8 RFC3986');
+foreach (['http://fuel.cargo.example','https://fuel.cargo.example.evil.test','https://evil.test@fuel.cargo.example','https://fuel.cargo.example:444','https://fuel.cargo.example\\@evil.test','https://fuel.cargo.example/%XX',"https://fuel.cargo.example/\n",'https://fuel.cargo.example/%0d%0aX:x','https://fuel.cargo.example/%5c','https://go.cargo.test/r/123456789abc','//fuel.cargo.example','https://fuel.cargo.example./'] as $url) rejects(fn()=>$b->build($url,$utm),$url);
+rejects(fn()=>$b->build('https://fuel.cargo.example',[]),'missing required');
+rejects(fn()=>$b->build('https://fuel.cargo.example/'.str_repeat('a',2050),$utm),'2048 byte limit');
+same('logistika-ekspo',Rules::slug('Логистика Экспо'),'transliteration');
+same('stoyka-u-vkhoda-a12',Rules::slug(' Стойка у входа___A12 '),'collapse separators');
+rejects(fn()=>Rules::identifier(str_repeat('a',81),80),'slug length');
+rejects(fn()=>Rules::date('2027-02-29'),'invalid date');
+foreach (Rules::REQUIRED as $type=>$fields) {
+    if ($type==='online') continue;
+    rejects(fn()=>Rules::details($type,[]),'required '.$type);
+    $details=array_fill_keys($fields,'sample'); if (isset($details['event_date'])) $details['event_date']='2027-05-10';
+    same('sample',Rules::details($type,$details)[$fields[0]],'valid '.$type);
+    $out=Rules::utm(['utm_campaign'=>'campaign','utm_id'=>'cg-1234567890abcdef'],$type,['place_slug'=>'entrance-a12'],$details,'9f4c21d6a8be');
+    same('qr',$out['utm_medium'],'offline medium'); same('',$out['utm_term'],'offline term'); same('entrance-a12-p-9f4c21d6a8be',$out['utm_content'],'content');
+}
+foreach (['=1+1',' +SUM(A1)','@SUM(A1)',"\tcmd",'-2+2'] as $value) same("'".$value,Rules::csvCell($value),'CSV formula');
+same('https://fuel.cargo.example',Rules::csvCell('https://fuel.cargo.example'),'CSV URL');
+same(['code'=>'9f4c21d6a8be','utm'=>[]],Decoder::parse('https://go.cargo.test/r/9f4c21d6a8be','go.cargo.test'),'short decode');
+same('9f4c21d6a8be',Decoder::parse($expected,'go.cargo.test')['code'],'full decode');
+same(null,Decoder::parse('https://evil.test/r/9f4c21d6a8be','go.cargo.test')['code'],'foreign short');
+same(null,Decoder::parse('https://u@go.cargo.test/r/9f4c21d6a8be','go.cargo.test')['code'],'userinfo decode');
+rejects(fn()=>Decoder::parse('https://fuel.cargo.example?utm_source=a&UTM_Source=b','go.cargo.test'),'ambiguous UTM');
+same('cargo-fuel-2027-logistika-ekspo',Rules::campaignCode('','cargo-fuel',2027,'Логистика Экспо'),'blank campaign code defaults');
+same('expo-custom',Rules::campaignCode('expo-custom','cargo-fuel',2027,'Логистика Экспо'),'custom campaign code preserved');
+same('123',Rules::campaignCode('123','cargo-fuel',2027,'Логистика Экспо'),'numeric campaign code');
+same('0',Rules::campaignCode('0','cargo-fuel',2027,'Логистика Экспо'),'zero campaign code');
+rejects(fn()=>Rules::campaignCode('выставка','cargo-fuel',2027,'Логистика Экспо'),'campaign code Latin only');
+// Version 2: print media, dotted sources and Roistat snapshots.
+same('vk.ads',Rules::source('vk.ads'),'dotted source');
+foreach (['.vk','vk.','vk..ads','VK.ads','vk/ads'] as $source) rejects(fn()=>Rules::source($source),'invalid source '.$source);
+rejects(fn()=>Rules::identifier('vk.ads',80),'dots remain forbidden in campaign identifiers');
+$print=Rules::details('print_media',['event'=>'Логистика','issue'=>'3-2027','position'=>'Полоса 12']);
+$printUtm=Rules::utm(['utm_campaign'=>'cargo-2027-print','utm_id'=>'cg-1234567890abcdef'],'print_media',[],$print,'123456789abc');
+same('print_media',$printUtm['utm_source'],'print source');
+same('logistika-3-2027-polosa-12-p-123456789abc',$printUtm['utm_content'],'print place from issue and position');
+rejects(fn()=>Rules::details('print_media',['event'=>'Логистика','position'=>'12']),'print issue required');
+$track=CargoUTM\Tracking::fromInput(['type'=>'online','use_roistat'=>true,'roistat_value'=>'12'],CargoUTM\Tracking::PRESETS['vk']);
+same(['rs'=>'vkads12_{{banner_id}}_{{search_phrase}}'],$track,'VK tracking template');
+foreach (CargoUTM\Tracking::PRESETS as $preset) CargoUTM\Tracking::validatePreset($preset);
+$r=$b->build('https://fuel.cargo.example?x=1&Roistat=old&%72s=old&x=2#frag',$utm,$track);
+same(['Roistat','rs'],$r['removed'],'replace tracking once decoded');
+same(true,str_contains($r['url'],'?x=1&x=2&'),'tracking preserves duplicate query pairs');
+same(true,str_ends_with($r['url'],'&rs=vkads12_{{banner_id}}_{{search_phrase}}#frag'),'macro braces preserved');
+same(true,str_contains($b->build('https://fuel.cargo.example?roistat=old&rs=legacy',$utm)['url'],'roistat=old&rs=legacy&'),'disabled tracking preserves input');
+same(['roistat'=>'telegram_ads'],CargoUTM\Tracking::fromInput(['use_roistat'=>true,'roistat_value'=>'telegram_ads']),'manual tracking');
+same(['rs'=>'custom'],CargoUTM\Tracking::fromInput(['use_roistat'=>true,'roistat_value'=>'rs=custom']),'manual rs');
+same([],CargoUTM\Tracking::fromInput(['use_roistat'=>false,'roistat_value'=>'bad']),'disabled optional tracking');
+same('a%20%26%23%3D_{keyword}',CargoUTM\Tracking::encode('a &#=_{keyword}'),'tracking RFC3986 with macros');
+foreach ([['url'=>'https://evil.test'],['roistat'=>'a','rs'=>'b'],['rs'=>''],['roistat'=>"a\r\nb"],['rs'=>'{bad macro}'],['rs'=>str_repeat('x',281)],['rs'=>'a\\b']] as $bad) rejects(fn()=>CargoUTM\Tracking::validate($bad),'invalid tracking');
+rejects(fn()=>CargoUTM\Tracking::fromInput(['type'=>'print_media','use_roistat'=>true,'roistat_value'=>'12']),'offline tracking');
+rejects(fn()=>CargoUTM\Tracking::fromInput(['use_roistat'=>true,'roistat_value'=>'not-id'],CargoUTM\Tracking::PRESETS['yandex']),'numeric channel ID');
+rejects(fn()=>CargoUTM\Tracking::validatePreset(['key'=>'url','template'=>'x[ID]']),'preset key whitelist');
+rejects(fn()=>CargoUTM\Tracking::validatePreset(['key'=>'rs','template'=>'x']),'missing preset ID');
+rejects(fn()=>$b->build('https://fuel.cargo.example/'.str_repeat('a',1800),$utm,['rs'=>str_repeat('b',200)]),'URL byte limit includes tracking');
+same($track,Decoder::parse($r['url'],'go.cargo.test')['tracking'],'tracking decode');
+rejects(fn()=>Decoder::parse('https://fuel.cargo.example?rs=a&RS=b','go.cargo.test'),'ambiguous tracking');
+if (function_exists('idn_to_ascii')) {
+    $idn=new UrlBuilder(['xn--e1afmkfd.xn--p1ai'],[]);
+    same(true,str_starts_with($idn->build('https://пример.рф/',$utm)['url'],'https://xn--e1afmkfd.xn--p1ai/'),'IDN');
+} else echo "SKIP: IDN needs intl\n";
+echo "PASS: $tests domain assertions\n";

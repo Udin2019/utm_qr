@@ -1,0 +1,91 @@
+# envsubst is restricted to CARGO_* so Nginx variables remain intact.
+log_format cargo_safe '$time_iso8601 status=$status bytes=$body_bytes_sent duration=$request_time';
+limit_req_zone $binary_remote_addr zone=cargo_go:10m rate=10r/s;
+map $arg_action $cargo_public_preview_key {
+    default "";
+    cargo_public_generator $binary_remote_addr;
+}
+limit_req_zone $cargo_public_preview_key zone=cargo_preview:10m rate=10r/s;
+server {
+    listen 80 default_server;
+    server_name _;
+    return 404;
+}
+server {
+    listen 80;
+    server_name ${CARGO_UTM_HOST} ${CARGO_GO_HOST};
+    access_log /var/log/nginx/access.log cargo_safe;
+    return 308 https://$host$request_uri;
+}
+server {
+    listen 443 ssl default_server;
+    server_name _;
+    ssl_certificate /run/cargo/tls.crt;
+    ssl_certificate_key /run/cargo/tls.key;
+    return 404;
+}
+# WordPress host: admin/API/download permissions are enforced by WordPress.
+server {
+    listen 443 ssl;
+    server_name ${CARGO_UTM_HOST};
+    ssl_certificate /run/cargo/tls.crt;
+    ssl_certificate_key /run/cargo/tls.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    root /var/www/html;
+    index index.php;
+    access_log /var/log/nginx/access.log cargo_safe;
+    # Error logs can contain request data: disabled; application logs use fixed codes.
+    error_log /dev/null crit;
+    client_max_body_size 2m;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy same-origin always;
+    add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+    location ~ /\. { deny all; }
+    location ~* ^/wp-content/.*\.(php|phtml|phar)$ { deny all; }
+    location ~* ^/wp-content/plugins/cargo-utm/(src|vendor)/ { deny all; }
+    location ~* (composer\.(json|lock)|wp-config\.php|readme\.html|license\.txt)$ { deny all; }
+    location = /robots.txt {
+        default_type text/plain;
+        return 200 "User-agent: *\nDisallow:\n";
+    }
+    location / { try_files $uri $uri/ /index.php?$args; }
+    location ~ \.php$ {
+        limit_req zone=cargo_preview burst=20 nodelay;
+        limit_req_status 429;
+        try_files $uri =404;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param HTTPS on;
+        fastcgi_param HTTP_AUTHORIZATION "";
+        fastcgi_pass wordpress:9000;
+        fastcgi_read_timeout 20s;
+    }
+}
+# Public host: one exact route shape, no WordPress fallback and no auth_basic.
+server {
+    listen 443 ssl;
+    server_name ${CARGO_GO_HOST};
+    ssl_certificate /run/cargo/tls.crt;
+    ssl_certificate_key /run/cargo/tls.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    access_log /var/log/nginx/go.log cargo_safe;
+    error_log /dev/null crit;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Cache-Control no-store always;
+    limit_req_status 429;
+    location ~ "^/r/(?<cargo_code>[a-f0-9]{12})$" {
+        limit_req zone=cargo_go burst=30 nodelay;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /opt/cargo/go/redirect.php;
+        fastcgi_param CARGO_SHORT_CODE $cargo_code;
+        fastcgi_param HTTP_HOST ${CARGO_GO_HOST};
+        fastcgi_param HTTPS on;
+        fastcgi_param HTTP_AUTHORIZATION "";
+        fastcgi_param QUERY_STRING "";
+        fastcgi_pass go:9000;
+        fastcgi_read_timeout 8s;
+        fastcgi_no_cache 1;
+        fastcgi_cache_bypass 1;
+    }
+    location / { return 404; }
+}
