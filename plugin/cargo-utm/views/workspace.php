@@ -122,8 +122,8 @@
                 <div class="link-field">
                   <span id="short-label">Короткая ссылка <small id="release-label">после сохранения</small></span>
                   <div class="copy-field">
-                    <input id="short-url" aria-labelledby="short-label" readonly spellcheck="false">
-                    <button class="icon-button" id="copy-short" type="button" aria-label="Скопировать короткую ссылку" title="Скопировать короткую ссылку"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg></button>
+                    <input id="short-url" aria-labelledby="short-label" readonly spellcheck="false" hidden>
+                    <button class="icon-button" id="copy-short" disabled type="button" aria-label="Скопировать короткую ссылку" title="Скопировать короткую ссылку"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg></button>
                   </div>
                 </div>
                 <label class="profile-field"><span>Размер PNG</span><select id="png-size"><option value="1024">1024 px</option><option value="2048" selected>2048 px</option><option value="4096">4096 px</option></select></label>

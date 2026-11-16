@@ -7,7 +7,7 @@ final class Workspace {
     public function __construct() { $this->store=new Store(); }
     public function boot(): void { add_action('wp_ajax_cargo_workspace',[$this,'api']); }
     public function render(bool $guest=false): void {
-        $config=['isGuest'=>$guest,'endpoint'=>$guest?admin_url('admin-ajax.php?action=cargo_public_generator'):admin_url('admin-ajax.php'),'nonce'=>wp_create_nonce($guest?'cargo_public_generator':'cargo_workspace'),'canCreate'=>current_user_can('cargo_create'),'canExport'=>current_user_can('cargo_export'),'canManage'=>current_user_can('cargo_manage'),'production'=>Config::production(),'initialView'=>($_GET['tab']??'')==='registry'?'register':(($_GET['tab']??'')==='decode'?'decode':'generator'),'initialRecord'=>max(0,(int)($_GET['view']??0)),'duplicate'=>max(0,(int)($_GET['duplicate']??0)),'links'=>['home'=>home_url('/'),'login'=>wp_login_url(home_url('/')),'logout'=>html_entity_decode(wp_logout_url(home_url('/')),ENT_QUOTES,'UTF-8'),'analytics'=>admin_url('admin.php?page=cargo-utm&tab=analytics'),'settings'=>admin_url('admin.php?page=cargo-utm&tab=settings')]];
+        $config=['shortLinksEnabled'=>Config::shortLinksEnabled(),'isGuest'=>$guest,'endpoint'=>$guest?admin_url('admin-ajax.php?action=cargo_public_generator'):admin_url('admin-ajax.php'),'nonce'=>wp_create_nonce($guest?'cargo_public_generator':'cargo_workspace'),'canCreate'=>current_user_can('cargo_create'),'canExport'=>current_user_can('cargo_export'),'canManage'=>current_user_can('cargo_manage'),'production'=>Config::production(),'initialView'=>($_GET['tab']??'')==='registry'?'register':(($_GET['tab']??'')==='decode'?'decode':'generator'),'initialRecord'=>max(0,(int)($_GET['view']??0)),'duplicate'=>max(0,(int)($_GET['duplicate']??0)),'links'=>['home'=>home_url('/'),'login'=>wp_login_url(home_url('/')),'logout'=>html_entity_decode(wp_logout_url(home_url('/')),ENT_QUOTES,'UTF-8'),'analytics'=>admin_url('admin.php?page=cargo-utm&tab=analytics'),'settings'=>admin_url('admin.php?page=cargo-utm&tab=settings')]];
         echo '<div class="cargo-app" id="cargo-app"><script type="application/json" id="cargo-config">'.wp_json_encode($config,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT).'</script>';
         require dirname(__DIR__).'/views/workspace.php';
         echo '</div>';
@@ -77,7 +77,7 @@ final class Workspace {
         $out['tracking']=json_decode($r['tracking_json']??'{}',true,512,JSON_THROW_ON_ERROR)?:[];
         $out['tags']+=($out['tracking']['tags']??[]);
         $out['details']=json_decode($r['details_json'],true,512,JSON_THROW_ON_ERROR);
-        $out['short_url']=Config::short($r['short_code']);
+        if (Config::shortLinksEnabled()) $out['short_url']=Config::short($r['short_code']);
         $out['hits']=(int)$wpdb->get_var($wpdb->prepare('SELECT COALESCE(SUM(get_count),0) FROM '.$this->store->table('daily_hits').' WHERE placement_id=%d',$id));
         foreach (['preview'=>0,'svg'=>0,'png'=>2048,'png1024'=>1024,'png4096'=>4096] as $format=>$size) {
             $out['downloads'][$format]=add_query_arg(['action'=>'cargo_download','id'=>$id,'format'=>$size?'png':$format,'size'=>$size,'_wpnonce'=>wp_create_nonce('cargo_download_'.$id)],admin_url('admin-post.php'));

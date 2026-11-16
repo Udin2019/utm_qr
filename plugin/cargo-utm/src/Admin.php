@@ -187,7 +187,9 @@ final class Admin {
         global $wpdb; $r=$this->store->row('placements',$id); if (!$r) throw new \InvalidArgumentException('Запись не найдена.');
         $brand=$this->store->row('brand_versions',(int)$r['brand_id']); $unit=$this->store->row('units',(int)$r['unit_id']);
         echo '<h2>Размещение #'.self::e($id).' · '.self::e($r['short_code']).'</h2><p>'.self::e($unit['name']).' · '.self::e($brand['name']).' v'.self::e($brand['version']).' · '.self::e($r['status']).'</p>';
-        foreach (['UTM-ссылка'=>$r['target_url'],'Короткая ссылка'=>Config::short($r['short_code'])] as $label=>$url) echo '<p><strong>'.self::e($label).'</strong></p><div class="cargo-copy"><input readonly value="'.esc_attr($url).'"><button type="button" class="button" data-copy>Копировать</button></div>';
+        $links=['UTM-ссылка'=>$r['target_url']];
+        if (Config::shortLinksEnabled()) $links['Короткая ссылка']=Config::short($r['short_code']);
+        foreach ($links as $label=>$url) echo '<p><strong>'.self::e($label).'</strong></p><div class="cargo-copy"><input readonly value="'.esc_attr($url).'"><button type="button" class="button" data-copy>Копировать</button></div>';
         $file=fn($format,$size=0)=>wp_nonce_url(add_query_arg(['action'=>'cargo_download','id'=>$id,'format'=>$format,'size'=>$size],admin_url('admin-post.php')),'cargo_download_'.$id);
         echo '<img class="cargo-qr" alt="QR размещения" src="'.esc_url($file('preview')).'"><p><a class="button" href="'.esc_url($file('svg')).'">SVG</a> ';
         foreach ([1024,2048,4096] as $size) echo '<a class="button" href="'.esc_url($file('png',$size)).'">PNG '.$size.'</a> ';
@@ -195,7 +197,7 @@ final class Admin {
         foreach (array_merge(array_intersect_key($r,array_flip(UrlBuilder::FIELDS)),['Правила'=>$r['rules_version'],'Шаблон ID'=>$r['template_id'],'Автор ID'=>$r['author_id'],'Создано UTC'=>$r['created_at']],json_decode($r['details_json'],true)) as $k=>$v) echo '<tr><th>'.self::e(Rules::LABELS[$k]??$k).'</th><td>'.self::e($v).'</td></tr>';
         echo '</table>';
         if (current_user_can('cargo_create')) echo '<p><a class="button" href="'.esc_url($this->link(['tab'=>'new','duplicate'=>$id])).'">Дублировать с новым кодом</a></p>';
-        if (in_array($r['type'],['outdoor','transport'],true)) echo '<p class="notice notice-info inline">Для печати скачайте SVG, сохраните белое поле, добавьте короткий адрес и призыв. Проверьте пробный макет на материале с iOS и Android. Для транспорта проверяйте безопасный сценарий с позиции пешехода.</p>';
+        if (in_array($r['type'],['outdoor','transport'],true)) echo '<p class="notice notice-info inline">Для печати скачайте SVG, сохраните белое поле, добавьте призыв. Проверьте пробный макет на материале с iOS и Android. Для транспорта проверяйте безопасный сценарий с позиции пешехода.</p>';
         if (current_user_can('cargo_manage')) {
             echo '<h3>Изменить назначение или статус</h3>'; $this->form('change'); echo '<input type="hidden" name="id" value="'.$id.'">';
             $this->input('url','Новое назначение (UTM сохраняются)'); $this->input('reason','Причина изменения назначения');
@@ -268,6 +270,7 @@ final class Admin {
             } else {
                 [$where]=$this->filters();
                 $columns=['id'=>'placement_id','unit_id'=>'ID бизнес-юнита','unit_name'=>'Бизнес-юнит','campaign_id'=>'ID кампании','campaign_name'=>'Кампания','type'=>'Тип носителя','event'=>'Событие','event_date'=>'Дата события','city'=>'Город','object_code'=>'Код объекта','details_json'=>'Параметры носителя JSON','original_url'=>'Целевой URL','target_url'=>'UTM URL','short_url'=>'Короткая ссылка','short_code'=>'Код','template_id'=>'ID версии шаблона','template_version'=>'Версия шаблона','brand_id'=>'ID профиля','brand_name'=>'Профиль бренда','brand_version'=>'Версия бренда','tracking_json'=>'Дополнительные параметры и версия пресета JSON','roistat'=>'roistat','rs'=>'rs','online_preset_id'=>'ID онлайн-пресета','online_preset_version'=>'Версия онлайн-пресета','rules_version'=>'Версия правил','status'=>'Статус','author_id'=>'Автор ID','created_at'=>'Создано UTC']+array_combine(UrlBuilder::FIELDS,UrlBuilder::FIELDS);
+                if (!Config::shortLinksEnabled()) unset($columns['short_url']);
                 $query='SELECT p.*,u.name unit_name,c.name campaign_name,t.version template_version,b.name brand_name,b.version brand_version FROM '.$this->store->table('placements').' p JOIN '.$this->store->table('units').' u ON u.id=p.unit_id JOIN '.$this->store->table('campaigns').' c ON c.id=p.campaign_id JOIN '.$this->store->table('template_versions').' t ON t.id=p.template_id JOIN '.$this->store->table('brand_versions').' b ON b.id=p.brand_id WHERE '.$where.' ORDER BY p.id';
             }
             nocache_headers(); header('Content-Type: text/csv; charset=UTF-8'); header('Content-Disposition: attachment; filename="cargo-'.$kind.'.csv"'); header('X-Content-Type-Options: nosniff');
@@ -280,7 +283,7 @@ final class Admin {
                         $tracking=json_decode($r['tracking_json']??'{}',true)?:[];
                         $r['roistat']=$tracking['tags']['roistat']??''; $r['rs']=$tracking['tags']['rs']??'';
                         $r['online_preset_id']=$tracking['preset_id']??''; $r['online_preset_version']=$tracking['preset_version']??'';
-                        $r['short_url']=Config::short($r['short_code']); $r['type']=Rules::TYPES[$r['type']]??$r['type']; $r['status']=['active'=>'Активно','archived'=>'В архиве','revoked'=>'Отозвано'][$r['status']]??$r['status']; }
+                        $r['short_url']=Config::shortLinksEnabled()?Config::short($r['short_code']):''; $r['type']=Rules::TYPES[$r['type']]??$r['type']; $r['status']=['active'=>'Активно','archived'=>'В архиве','revoked'=>'Отозвано'][$r['status']]??$r['status']; }
                     fputcsv($out,array_map(fn($key)=>Rules::csvCell($r[$key]??''),array_keys($columns)),';','"','');
                 }
                 if (count($rows)<500) break;

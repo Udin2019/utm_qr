@@ -19,7 +19,12 @@ $wpdb=new class {
     }
 };
 $workspace=new CargoUTM\Workspace();
+putenv('CARGO_SHORT_LINKS_ENABLED=0');
 $record=$workspace->record(7);
+if (isset($record['short_url'])) throw new RuntimeException('Disabled short URL exposed');
+putenv('CARGO_SHORT_LINKS_ENABLED=1');
+if ($workspace->record(7)['short_url']!==CargoUTM\Config::short('123456789abc')) throw new RuntimeException('Enabled short URL missing');
+putenv('CARGO_SHORT_LINKS_ENABLED=0');
 foreach ($record['downloads'] as $format=>$url) {
     if (str_contains($url,'&amp;') || str_contains($url,'&#')) throw new RuntimeException('HTML entity in JSON download URL: '.$format);
     parse_str(parse_url($url,PHP_URL_QUERY),$query);

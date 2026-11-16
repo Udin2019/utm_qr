@@ -13,6 +13,7 @@ node --check plugin/cargo-utm/assets/admin.js
 node --check plugin/cargo-utm/assets/ui/app.js
 node tests/draft.js
 node tests/online_preset.js
+node tests/short_links.js
 python3 -m py_compile tests/qr_decode.py tests/http.py tests/ui_contract.py scripts/install-public-https.py tests/public_https.py
 python3 tests/ui_contract.py
 python3 tests/public_https.py

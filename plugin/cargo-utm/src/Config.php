@@ -11,5 +11,8 @@ final class Config {
         if ($publicHost) $blocked[]=$publicHost;
         return new UrlBuilder(explode(',',self::env('CARGO_ALLOWED_HOSTS','fuel.cargo.example')),$blocked);
     }
+    public static function shortLinksEnabled(): bool {
+        return self::env('CARGO_SHORT_LINKS_ENABLED','0')==='1';
+    }
     public static function short(string $code): string { return 'https://'.self::hosts()[1].'/r/'.$code; }
 }

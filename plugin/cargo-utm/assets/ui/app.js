@@ -139,9 +139,12 @@
     } else output.append(node('p', 'Метки появятся после заполнения обязательных полей.', 'result-meta'));
     $('qr-image').hidden = !saved; $('qr-empty').hidden = saved;
     if (saved) $('qr-image').src = result.downloads.preview; else $('qr-image').removeAttribute('src');
-    $('short-url').value = saved ? result.short_url : '';
-    $('release-label').textContent = saved ? 'выпущена' : 'после сохранения';
-    for (const id of ['copy-short', 'download-svg', 'download-png']) $(id).disabled = !saved;
+    const shortAvailable = Boolean(config.shortLinksEnabled && saved && result.short_url);
+    $('short-url').hidden = !shortAvailable;
+    $('short-url').value = shortAvailable ? result.short_url : '';
+    $('copy-short').disabled = !shortAvailable;
+    $('release-label').textContent = config.shortLinksEnabled ? (saved ? 'выпущена' : 'после сохранения') : 'временно недоступна';
+    for (const id of ['download-svg', 'download-png']) $(id).disabled = !saved;
     $('save-status').hidden = !saved;
   }
   function dirty() {
@@ -214,14 +217,18 @@
   function recordBody(container, record, manage = true) {
     container.replaceChildren(node('p', record.campaign_name, 'result-title'), node('p', `${record.unit_name} · ${state.data.types[record.type]} · ${statusLabel(record.status)}`, 'result-meta'));
     const image = document.createElement('img'); image.src = record.downloads.preview; image.alt = 'QR размещения'; image.className = 'detail-qr';
-    container.append(image, node('code', record.short_url, 'url-output'), node('code', record.target_url, 'url-output'), tagGrid(record.tags));
+    container.append(image);
+    if (config.shortLinksEnabled && record.short_url) container.append(node('code', record.short_url, 'url-output'));
+    container.append(node('code', record.target_url, 'url-output'), tagGrid(record.tags));
     const details = { ...record.details, 'Профиль': `${record.brand_name} v${record.brand_version}`, 'Шаблон / правила': `${record.template_version} / ${record.rules_version}`, 'Создано UTC': record.created_at, 'Автор ID': record.author_id, 'Переходы GET': record.hits };
     if (record.tracking.preset_id) details['Версия онлайн-пресета'] = `${record.tracking.preset_id} / v${record.tracking.preset_version}`;
     const dl = node('dl', undefined, 'tag-grid'); Object.entries(details).forEach(([k, v]) => { if (v) dl.append(node('dt', state.data.labels[k] || k), node('dd', String(v))); }); container.append(dl);
     const actions = node('div', undefined, 'result-actions');
-    actions.append(button('Копировать UTM', () => copy(record.target_url)), button('Копировать короткую', () => copy(record.short_url)), link('SVG', record.downloads.svg), link('PNG 1024', record.downloads.png1024), link('PNG 2048', record.downloads.png), link('PNG 4096', record.downloads.png4096));
+    actions.append(button('Копировать UTM', () => copy(record.target_url)));
+    if (config.shortLinksEnabled && record.short_url) actions.append(button('Копировать короткую', () => copy(record.short_url)));
+    actions.append(link('SVG', record.downloads.svg), link('PNG 1024', record.downloads.png1024), link('PNG 2048', record.downloads.png), link('PNG 4096', record.downloads.png4096));
     if (config.canCreate) actions.append(button('Дублировать', guarded(() => duplicate(record)))); container.append(actions);
-    if (['outdoor', 'transport', 'print_media'].includes(record.type)) container.append(node('p', 'Сохраните защитное поле, добавьте короткий адрес и подпись. Перед печатью проверьте макет в реальном масштабе на iOS и Android.', 'field-note'));
+    if (['outdoor', 'transport', 'print_media'].includes(record.type)) container.append(node('p', 'Сохраните защитное поле и добавьте подпись. Перед печатью проверьте макет в реальном масштабе на iOS и Android.', 'field-note'));
     const history = node('details'); history.append(node('summary', 'История изменений'));
     record.audit.forEach(a => { const entry = node('details'); entry.append(node('summary', `${a.created_at} UTC · ${a.action} · автор ${a.author_id}`), node('p', a.reason), node('pre', a.old_json + ' → ' + a.new_json)); history.append(entry); }); container.append(history);
     if (!config.canManage || !manage) return;
@@ -337,7 +344,7 @@
     form.addEventListener('submit', save);
     $('profile').addEventListener('change', dirty);
     $('clear-form').addEventListener('click', () => { $('destination').value = ''; $('campaign').value = ''; $('place-slug').value = ''; $('guest-campaign-name').value = ''; $('guest-campaign-code').value = ''; state.details = {}; state.online = {}; state.restoredCampaign = null; try { sessionStorage.removeItem(draftKey); } catch {} renderFields(); dirty(); });
-    $('copy-short').addEventListener('click', () => { if (state.current) copy(state.current.short_url); });
+    $('copy-short').addEventListener('click', () => { if (config.shortLinksEnabled && state.current?.short_url) copy(state.current.short_url); });
     ['svg', 'png'].forEach(format => $('download-' + format).addEventListener('click', () => { if (state.current) download(state.current, format); }));
     $('png-size').addEventListener('change', () => { $('download-png').querySelector('.format-description').textContent = $('png-size').value + ' px'; });
     $('new-placement').addEventListener('click', guarded(() => setView('generator')));

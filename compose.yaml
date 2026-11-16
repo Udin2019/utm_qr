@@ -1,6 +1,7 @@
 name: cargo-utm
 x-app-env: &app-env
   CARGO_ENV: ${CARGO_ENV:-staging}
+  CARGO_SHORT_LINKS_ENABLED: ${CARGO_SHORT_LINKS_ENABLED:-0}
   CARGO_PUBLIC_UTM_URL: ${CARGO_PUBLIC_UTM_URL:-}
   CARGO_UTM_HOST: ${CARGO_UTM_HOST:-utm.cargo.test}
   CARGO_GO_HOST: ${CARGO_GO_HOST:-go.cargo.test}
