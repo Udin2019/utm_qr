@@ -37,6 +37,8 @@ guest.ctx.authenticate('register');
 const login = new URL(guest.ctx.redirect);
 assert.equal(login.pathname, '/wp-login.php');
 assert.equal(login.searchParams.get('redirect_to'), 'https://utmqr.kit-rb.com/?tab=registry');
+guest.ctx.authenticate('generator', 'https://utmqr.kit-rb.com/wp-admin/admin.php?page=cargo-utm&tab=settings');
+assert.equal(new URL(guest.ctx.redirect).searchParams.get('redirect_to'), 'https://utmqr.kit-rb.com/wp-admin/admin.php?page=cargo-utm&tab=settings');
 const draft = guest.storage.get(guest.ctx.draftKey);
 assert(draft);
 const editor = browser(false);

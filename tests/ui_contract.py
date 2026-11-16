@@ -35,7 +35,7 @@ campaign_code = next(attrs for tag, attrs in page.tags if tag == 'input' and att
 assert 'required' not in campaign_code, 'Custom campaign code must be optional'
 assert "f.campaign_code.value =" not in (assets / 'app.js').read_text(), 'Auto-code must not overwrite user input'
 navigation = re.search(r'<nav class="navigation".*?</nav>', html, re.S).group(0)
-assert 'data-view="generator"' not in navigation, 'Generator belongs at the site root'
+assert 'data-view="generator"' in navigation, 'Public generator must remain in navigation'
 assert 'data-view="register"' in navigation and 'data-view="decode"' in navigation
 assert any(tag == 'a' and attrs.get('id') == 'generator-home' for tag, attrs in page.tags), 'Home link missing'
 assert page.carriers == {'exhibition', 'conference', 'outdoor', 'transport', 'offline_point', 'print_media'}

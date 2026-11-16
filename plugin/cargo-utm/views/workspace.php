@@ -30,6 +30,7 @@
         <img class="brand-logo" src="<?php echo esc_url(plugins_url('assets/ui/cargonomica.svg', dirname(__DIR__).'/cargo-utm.php')); ?>" width="204" height="32" alt="">
       </a>
       <nav class="navigation" aria-label="Разделы">
+        <button type="button" class="nav-item is-active" data-view="generator" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-generator"/></svg>Генератор</button>
         <button type="button" class="nav-item" data-view="register"><svg class="icon" aria-hidden="true"><use href="#i-register"/></svg>Реестр</button>
         <button type="button" class="nav-item" data-view="decode"><svg class="icon" aria-hidden="true"><use href="#i-decode"/></svg>Расшифровка</button>
       </nav>

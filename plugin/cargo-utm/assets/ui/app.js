@@ -270,11 +270,11 @@
     } catch (e) { error($('campaign-error'), e.message); } finally { submit.disabled = false; }
   }
   const draftKey = 'cargo-utm-public-draft.v1';
-  function authenticate(view = 'generator') {
+  function authenticate(view = 'generator', destination = null) {
     try { sessionStorage.setItem(draftKey, JSON.stringify({ time: Date.now(), input: payload(), mode: state.mode, carrier: state.carrier, details: state.details, online: state.online })); }
     catch { notify('Черновик не удалось сохранить в браузере. Скопируйте UTM-ссылку перед входом.'); }
-    const target = new URL(config.links.home);
-    if (view !== 'generator') target.searchParams.set('tab', view === 'register' ? 'registry' : view);
+    const target = new URL(destination || config.links.home);
+    if (!destination && view !== 'generator') target.searchParams.set('tab', view === 'register' ? 'registry' : view);
     const login = new URL(config.links.login); login.searchParams.set('redirect_to', target.href);
     window.location.assign(login.href);
   }
@@ -326,8 +326,12 @@
     state.data = await api('bootstrap'); fillCatalogs();
     root.querySelector('.environment').hidden = config.production;
     const nav = root.querySelector('.navigation');
-    if (!config.isGuest) nav.append(link('Переходы · UTC', config.links.analytics));
-    if (config.canManage) nav.append(link('Справочники', config.links.settings));
+    if (config.isGuest) {
+      nav.append(button('Переходы · UTC', () => authenticate('generator', config.links.analytics), 'nav-item'), button('Справочники', () => authenticate('generator', config.links.settings), 'nav-item'));
+    } else {
+      nav.append(link('Переходы · UTC', config.links.analytics));
+      if (config.canManage) nav.append(link('Справочники', config.links.settings));
+    }
     nav.querySelectorAll('a').forEach(a => { a.className = 'nav-item'; });
     if (!config.canCreate && !config.isGuest) root.querySelectorAll('[data-view=generator],#new-placement,#create-campaign').forEach(el => { el.hidden = true; });
     const hits = button('CSV · переходы по дням', () => { if (state.exports.hits) window.location.assign(state.exports.hits); }); hits.id = 'export-hits'; $('export-csv').after(hits);
