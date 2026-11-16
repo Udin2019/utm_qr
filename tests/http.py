@@ -4,6 +4,7 @@ Anonymous wp-admin requests must redirect to WordPress login; private handlers r
 """
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -21,6 +22,16 @@ def request(domain, path, method='HEAD'):
     return status, {key.lower(): value for key, value in values.items()}
 
 
+def public_body(path, fields=None):
+    args = ['curl', '--silent', '--show-error', '--insecure', '--max-time', '10', '--noproxy', '*', '--resolve', f'{internal}:{port}:127.0.0.1', '--write-out', '\n%{http_code}']
+    if fields is not None:
+        for key, value in fields.items():
+            args += ['--data-urlencode', f'{key}={value}']
+    result = subprocess.run([*args, f'https://{internal}:{port}{path}'], check=True, capture_output=True, text=True)
+    body, status = result.stdout.rsplit('\n', 1)
+    return int(status), body
+
+
 def counter(row):
     # Query using existing WP connection. SQL uses integer fixture IDs only.
     placement_id = int(row['id'])
@@ -30,8 +41,26 @@ def counter(row):
 
 
 status, headers = request(internal, '/')
-assert status in (302, 303) and '/wp-login.php' in headers.get('location', ''), 'Root must lead anonymous users to login'
+assert status == 200 and 'text/html' in headers.get('content-type', ''), 'Root must serve the public generator'
 assert 'noindex' in headers.get('x-robots-tag', ''), 'Root must carry noindex'
+status, body = public_body('/')
+assert status == 200 and 'class="cargo-standalone"' in body, 'Standalone shell missing'
+match = re.search(r'<script type="application/json" id="cargo-config">(.*?)</script>', body, re.S)
+assert match, 'Generator configuration missing'
+config = json.loads(match[1])
+assert config['isGuest'] and not config['canCreate'], 'Anonymous permissions incorrect'
+assert config['endpoint'].endswith('/wp-admin/admin-ajax.php?action=cargo_public_generator')
+public_path = '/wp-admin/admin-ajax.php?action=cargo_public_generator'
+fields = {'nonce': config['nonce'], 'op': 'bootstrap', 'payload': '{}'}
+status, body = public_body(public_path, fields)
+assert status == 200, 'Public bootstrap unavailable'
+catalog = json.loads(body)['data']
+assert catalog['campaigns'] == [] and not any(key in catalog for key in ('placements', 'audit', 'authors', 'downloads', 'hits')), 'Public catalog leaks private data'
+for op in ('issue', 'registry', 'record', 'decode', 'campaign', 'change'):
+    assert public_body(public_path, dict(fields, op=op))[0] == 403, f'Guest operation exposed: {op}'
+assert request(internal, public_path)[0] == 405, 'Public API must require POST'
+assert public_body(public_path, dict(fields, nonce='invalid'))[0] == 403, 'Public API nonce missing'
+
 status, headers = request(internal, '/robots.txt', 'GET')
 assert status == 200 and 'noindex' in headers.get('x-robots-tag', ''), 'Robots endpoint/noindex missing'
 status, headers = request(internal, '/wp-admin/')
@@ -69,4 +98,4 @@ row = fixtures['revoked']
 before = counter(row)
 assert request(host, f"/r/{row['short_code']}", 'GET')[0] == 410
 assert counter(row) == before, 'Revoked must not increment'
-print('PASS: WordPress login protection, no Basic Auth, private handlers, public isolation, redirects, methods, GET/HEAD counters')
+print('PASS: public generator isolation, WordPress login protection, no Basic Auth, private handlers, public isolation, redirects, methods, GET/HEAD counters')

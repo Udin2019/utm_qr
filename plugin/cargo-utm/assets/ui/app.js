@@ -280,25 +280,25 @@
   function restoreDraft() {
     let draft;
     try { draft = JSON.parse(sessionStorage.getItem(draftKey) || 'null'); } catch { return; }
-    if (!draft || !Number.isFinite(draft.time) || Date.now() - draft.time > 86400000 || !draft.input) return;
+    if (!draft || !Number.isFinite(draft.time) || draft.time > Date.now() || Date.now() - draft.time > 86400000 || !draft.input || typeof draft.input !== 'object') return;
     const input = draft.input;
     if ([...$('business').options].some(o => o.value === String(input.unit_id))) $('business').value = String(input.unit_id);
     selectUnit();
     if (['online', 'offline'].includes(draft.mode)) state.mode = draft.mode;
-    if (state.data.visible[draft.carrier]) state.carrier = draft.carrier;
+    if (draft.carrier !== 'online' && state.data.visible[draft.carrier]) state.carrier = draft.carrier;
     if (draft.details && typeof draft.details === 'object') state.details = draft.details;
     if (draft.online && typeof draft.online === 'object') state.online = draft.online;
     $('destination').value = input.url || ''; $('place-slug').value = input.place_slug || '';
+    if (input.brand_id === 'corporate') {
+      const common = state.data.brands.find(b => b.unit_id === null);
+      if (common) $('profile').value = String(common.id);
+    }
     if (config.isGuest) {
       $('guest-campaign-name').value = input.campaign_name || '';
       $('guest-campaign-year').value = input.campaign_year || new Date().getFullYear();
       $('guest-campaign-code').value = input.campaign_code || '';
     } else {
       state.restoredCampaign = { name: input.campaign_name || '', year: input.campaign_year, code: input.campaign_code || '' };
-      if (input.brand_id === 'corporate') {
-        const common = state.data.brands.find(b => b.unit_id === null);
-        if (common) $('profile').value = String(common.id);
-      }
       notify('Черновик восстановлен. Выберите кампанию или нажмите «Создать кампанию».');
     }
     renderFields(); dirty();
@@ -325,7 +325,7 @@
     });
     form.addEventListener('submit', save);
     $('profile').addEventListener('change', dirty);
-    $('clear-form').addEventListener('click', () => { $('destination').value = ''; $('campaign').value = ''; $('place-slug').value = ''; state.details = {}; state.online = {}; state.restoredCampaign = null; try { sessionStorage.removeItem(draftKey); } catch {} renderFields(); dirty(); });
+    $('clear-form').addEventListener('click', () => { $('destination').value = ''; $('campaign').value = ''; $('place-slug').value = ''; $('guest-campaign-name').value = ''; $('guest-campaign-code').value = ''; state.details = {}; state.online = {}; state.restoredCampaign = null; try { sessionStorage.removeItem(draftKey); } catch {} renderFields(); dirty(); });
     $('copy-short').addEventListener('click', () => { if (state.current) copy(state.current.short_url); });
     ['svg', 'png'].forEach(format => $('download-' + format).addEventListener('click', () => { if (state.current) download(state.current, format); }));
     $('png-size').addEventListener('change', () => { $('download-png').querySelector('.format-description').textContent = $('png-size').value + ' px'; });

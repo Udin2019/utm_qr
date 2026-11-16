@@ -62,7 +62,7 @@ class PublicHTTPS(unittest.TestCase):
             result = subprocess.run(['php', '-r', wordpress + 'echo WP_HOME . "|" . WP_SITEURL;'], env=env, check=True, capture_output=True, text=True)
             self.assertEqual(result.stdout, expected + '|' + expected)
 
-    def test_proxy_keeps_basic_auth_and_verifies_origin(self):
+    def test_proxy_verifies_origin_and_forwards_authorization(self):
         text = (ROOT / 'infra/nginx/public/utmqr-https.conf.template').read_text()
         self.assertIn('proxy_ssl_verify on;', text)
         self.assertIn('proxy_set_header Authorization $http_authorization;', text)
@@ -90,6 +90,11 @@ class PublicHTTPS(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'curl=60.*SSL certificate verification failed'):
                 installer.origin_status('utm.cargo.test', 18443, Path('/test/ca.crt'), attempts=3)
             self.assertEqual(run.call_count, 1)
+
+    def test_origin_accepts_public_generator(self):
+        result = subprocess.CompletedProcess([], 0, '200', '')
+        with patch.object(installer, 'run', return_value=result):
+            self.assertEqual(installer.origin_status('utm.cargo.test', 18443, Path('/test/ca.crt')), '200')
 
     def test_origin_accepts_wordpress_login_redirect(self):
         result = subprocess.CompletedProcess([], 0, '302', '')

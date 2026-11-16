@@ -85,7 +85,7 @@ def origin_status(host, port, cert=None, attempts=1):
     for attempt in range(attempts):
         last = run(args, capture=True, check=False)
         status = last.stdout.strip()
-        if last.returncode == 0 and status in ('302', '303', '401'):
+        if last.returncode == 0 and status in ('200', '302', '303', '401'):
             return status
         # A recreated container can reset/refuse TLS before Nginx starts.
         # Certificate verification errors (e.g. curl60) are never bypassed.
@@ -125,8 +125,8 @@ def main():
     if '38.180.121.98' not in addresses:
         raise RuntimeError('DNS A does not contain the confirmed server IP')
     run(['docker', 'compose', 'config', '--quiet'])
-    if origin_status(host, port) not in ('302', '303', '401'):
-        raise RuntimeError('Origin does not return the expected WordPress login redirect')
+    if origin_status(host, port) not in ('200', '302', '303', '401'):
+        raise RuntimeError('Origin does not return the generator or WordPress login redirect')
     listeners = run(['ss', '-H', '-ltnp', '( sport = :80 or sport = :443 )'], capture=True).stdout
     for line in listeners.splitlines():
         if '"xray"' not in line and '"nginx"' not in line:
@@ -203,8 +203,8 @@ def main():
         origin_changed = True
         run(['docker', 'compose', 'up', '-d', '--no-deps', '--force-recreate', 'wordpress'])
         run(['docker', 'compose', 'up', '-d', '--no-deps', '--force-recreate', 'nginx'])
-        if origin_status(host, port, origin_cert, attempts=15) not in ('302', '303'):
-            raise RuntimeError('Updated origin failed verified TLS/WordPress login redirect check')
+        if origin_status(host, port, origin_cert, attempts=15) not in ('200', '302', '303'):
+            raise RuntimeError('Updated origin failed verified TLS/WordPress entry check')
         # The public URL is supplied in Compose configuration, not baked into images.
         expected = run(['docker', 'compose', 'exec', '-T', 'wordpress', 'wp', '--allow-root', '--path=/var/www/html', 'eval', 'echo home_url();'], capture=True).stdout.strip()
         if expected != 'https://' + DOMAIN:
