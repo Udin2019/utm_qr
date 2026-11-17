@@ -46,4 +46,23 @@ if ($method==='GET') {
         error_log($diagnostic);
     }
 }
+require __DIR__.'/Tracker.php';
+if ($method==='GET' && \CargoTracking\Tracker::enabled() && !\CargoTracking\Tracker::bot((string)($_SERVER['HTTP_USER_AGENT']??''))) {
+    try {
+        $tracker=new \CargoTracking\Tracker((string)getenv('CARGO_TRACKING_KEY'));
+        $id=$tracker->cookieId($_COOKIE[\CargoTracking\Tracker::COOKIE]??null)??bin2hex(random_bytes(16));
+        $ticket=$tracker->ticket($code,$id,time());
+        $nonce=base64_encode(random_bytes(18));
+        $config=json_encode(['ticket'=>$ticket,'target'=>$url],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR);
+        $script=file_get_contents(__DIR__.'/tracker.js');
+        if ($script===false) throw new RuntimeException('Tracking script unavailable');
+        setcookie(\CargoTracking\Tracker::COOKIE,$tracker->cookie($id),['expires'=>time()+\CargoTracking\Tracker::RETENTION,'path'=>'/','secure'=>true,'httponly'=>true,'samesite'=>'Lax']);
+        header('Content-Type: text/html; charset=UTF-8');
+        header("Content-Security-Policy: default-src 'none'; script-src 'nonce-{$nonce}'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'");
+        header('Referrer-Policy: no-referrer'); header('X-Frame-Options: DENY');
+        $escaped=htmlspecialchars($url,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+        echo '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><meta http-equiv="refresh" content="1;url='.$escaped.'"><title>Переход</title></head><body><a href="'.$escaped.'">Перейти на сайт</a><noscript><meta http-equiv="refresh" content="0;url='.$escaped.'"></noscript><script nonce="'.$nonce.'">const tracking='.$config.';'.$script.'</script></body></html>';
+        exit;
+    } catch (Throwable $e) { error_log('cargo_tracking page_failed'); }
+}
 header('Location: '.$url,true,302);

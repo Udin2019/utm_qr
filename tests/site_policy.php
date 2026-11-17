@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__.'/../plugin/cargo-utm/src/Config.php';
+require __DIR__.'/../plugin/cargo-utm/src/LoginMail.php';
 require __DIR__.'/../plugin/cargo-utm/src/SitePolicy.php';
 require __DIR__.'/../plugin/cargo-utm/src/Store.php';
 require __DIR__.'/../plugin/cargo-utm/src/Workspace.php';

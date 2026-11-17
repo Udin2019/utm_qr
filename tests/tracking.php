@@ -1,0 +1,42 @@
+<?php
+declare(strict_types=1);
+require __DIR__.'/../go/Tracker.php';
+use CargoTracking\Tracker;
+$count=0;
+function check(bool $ok,string $label): void { global $count; ++$count; if (!$ok) throw new RuntimeException($label); }
+function invalid(callable $fn,string $label): void { try { $fn(); } catch (InvalidArgumentException $e) { check(true,$label); return; } throw new RuntimeException($label); }
+invalid(fn()=>new Tracker(''),'Missing key');
+$t=new Tracker(str_repeat('a',64)); $now=1800000000; $id=str_repeat('b',32); $code='123456789abc';
+$cookie=$t->cookie($id); check($t->cookieId($cookie)===$id,'Signed cookie');
+check($t->cookieId($cookie.'x')===null && $t->cookieId([])===null,'Malformed cookies');
+check($t->cookieId(str_repeat('c',32).substr($cookie,32))===null,'Forged cookie');
+$token=$t->ticket($code,$id,$now); $ticket=$t->readTicket($token,$now);
+check($ticket['code']===$code && strlen($ticket['event'])===32,'Signed event');
+check($t->readTicket($token,$now+120)['event']===$ticket['event'],'Ticket TTL boundary');
+invalid(fn()=>$t->readTicket($token,$now+121),'Expired ticket');
+invalid(fn()=>$t->readTicket($token,$now-6),'Future ticket');
+invalid(fn()=>$t->readTicket(str_replace($code,'000000000000',$token),$now),'Ticket placement tamper');
+invalid(fn()=>$t->readTicket([],$now),'Malformed ticket');
+$s=Tracker::signals((object)['width'=>1920,'height'=>1080,'language'=>'ru-RU','timezone'=>'Europe/Moscow','dpr'=>2,'depth'=>24,'touch'=>0,'cores'=>8]);
+check($s['width']===1080.0 && $s['height']===1920.0,'Orientation-independent dimensions');
+check(Tracker::signals((object)['width'=>1080,'height'=>1920,'language'=>'ru-RU','timezone'=>'Europe/Moscow','dpr'=>2,'depth'=>24,'touch'=>0,'cores'=>8])===$s,'Same normalized rotated fingerprint');
+foreach ([(object)['width'=>[]],(object)['width'=>20001],(object)['timezone'=>"Europe/Moscow\n"],(object)['extra'=>true],[]] as $v) invalid(fn()=>Tracker::signals($v),'Signal schema');
+$ua='Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0 Safari/537.36';
+$identity=$t->identity($ticket,$cookie,$s,$ua);
+check($identity['kind']==='cookie' && $identity['os']==='Windows' && $identity['browser']==='Chrome','Cookie identity and device');
+$estimate=$t->identity($ticket,null,$s,$ua);
+check($estimate['kind']==='fingerprint' && $estimate['visitor']!==$identity['visitor'],'Cookieless identity separate');
+$otherId=str_repeat('c',32); $other=$t->readTicket($t->ticket($code,$otherId,$now),$now);
+$otherIdentity=$t->identity($other,$t->cookie($otherId),$s,$ua);
+check($identity['visitor']!==$otherIdentity['visitor'] && $identity['fingerprint']===$otherIdentity['fingerprint'],'Different cookies never merge on identical fingerprint');
+$unknown=$t->identity($ticket,null,Tracker::signals((object)[]),$ua); check($unknown['kind']==='unknown','Unavailable signals');
+check($t->identity($ticket,$t->cookie($otherId),$s,$ua)['kind']==='fingerprint','Cookie must match ticket binding');
+check(Tracker::session('old',$now,$now+1799,'new')==='old','Within visit');
+check(Tracker::session('old',$now,$now+1800,'new')==='new','30 minute boundary');
+check(Tracker::session('old',$now,$now-1,'new')==='old','Out-of-order request');
+check(Tracker::session('old',strtotime('2026-11-17 23:59:00 UTC'),strtotime('2026-11-18 00:01:00 UTC'),'new')==='old','UTC midnight does not split session');
+check(Tracker::bot('Googlebot/2.1') && Tracker::bot('facebookexternalhit/1.1') && !Tracker::bot($ua),'Basic robot filtering');
+putenv('CARGO_TRACKING_ENABLED=0'); putenv('CARGO_TRACKING_KEY='.str_repeat('a',64)); check(!Tracker::enabled(),'Disabled by default');
+putenv('CARGO_TRACKING_ENABLED=1'); check(Tracker::enabled(),'Valid explicit enable');
+putenv('CARGO_TRACKING_KEY='); check(!Tracker::enabled(),'Missing secret fails closed');
+echo "PASS: $count tracking cookie, fingerprint, signed event, UTC and session checks\n";

@@ -67,6 +67,10 @@ try {
     // Limit these permissions to the aggregate's three columns; the query
     // itself only increments get_count and never changes the key.
     $db->exec("GRANT INSERT (placement_id,day_utc,get_count), UPDATE (placement_id,day_utc,get_count), SELECT (placement_id,day_utc,get_count) ON `$dbName`.`{$prefix}cargo_utm_daily_hits` TO $account");
+    stage('grant-go-visit-tracking');
+    // Only pseudonymous tracking state/events; no access to WP users or campaigns.
+    $db->exec("GRANT SELECT, INSERT, UPDATE ON `$dbName`.`{$prefix}cargo_utm_visitor_state` TO $account");
+    $db->exec("GRANT SELECT, INSERT ON `$dbName`.`{$prefix}cargo_utm_visit_events` TO $account");
     $completed=true;
     echo "Cargo setup completed\n";
 } catch (Throwable $e) {

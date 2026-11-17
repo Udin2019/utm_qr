@@ -37,6 +37,11 @@ if (isset($argv[1])) {
 }
 $input=['unit_id'=>7,'campaign_name'=>'Выставка','campaign_year'=>2026,'type'=>'online','url'=>'https://fuel.cargo.example/cards?utm_source=old#form','utm_source'=>'yandex','utm_medium'=>'cpc'];
 $cases=[['label'=>'catalog','op'=>'bootstrap','status'=>200],['label'=>'preview','op'=>'preview','status'=>200,'input'=>$input],['label'=>'custom code and macros','op'=>'preview','status'=>200,'input'=>$input+['campaign_code'=>'banner_25','preset'=>'yandex','use_roistat'=>true,'roistat_value'=>'123']]];
+$conference=array_replace($input,['type'=>'conference','details'=>['event'=>'Конференция','event_date'=>'2027-05-10','city'=>'Москва','object_code'=>'hall-a']]);
+$cases[]=['label'=>'conference without speaker','op'=>'preview','status'=>200,'input'=>$conference];
+$cases[]=['label'=>'conference speaker','op'=>'preview','status'=>200,'input'=>array_replace($conference,['details'=>$conference['details']+['speaker'=>'Иван Петров']])];
+$cases[]=['label'=>'conference speaker too long','op'=>'preview','status'=>400,'input'=>array_replace($conference,['details'=>$conference['details']+['speaker'=>str_repeat('Я',251)]])];
+$cases[]=['label'=>'conference speaker wrong type','op'=>'preview','status'=>400,'input'=>array_replace($conference,['details'=>$conference['details']+['speaker'=>new stdClass()]])];
 $cases[]=['label'=>'partner referral','op'=>'preview','status'=>200,'input'=>array_replace($input,['preset'=>'partner_site','utm_source'=>'partner.ru','utm_medium'=>'referral'])];
 foreach (['registry','record','decode','issue','campaign','change','slug','unknown'] as $op) $cases[]=['label'=>'private '.$op,'op'=>$op,'status'=>403];
 $cases[]=['label'=>'GET','op'=>'bootstrap','method'=>'GET','status'=>405];

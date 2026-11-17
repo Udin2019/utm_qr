@@ -31,6 +31,13 @@ services:
         WORDPRESS_IMAGE: ${WORDPRESS_IMAGE:-wordpress:php8.3-fpm}
     environment:
       <<: *app-env
+      CARGO_EMAIL_LOGIN_ENABLED: ${CARGO_EMAIL_LOGIN_ENABLED:-0}
+      CARGO_SMTP_HOST: ${CARGO_SMTP_HOST:-}
+      CARGO_SMTP_PORT: ${CARGO_SMTP_PORT:-587}
+      CARGO_SMTP_SECURITY: ${CARGO_SMTP_SECURITY:-tls}
+      CARGO_SMTP_USER: ${CARGO_SMTP_USER:-}
+      CARGO_SMTP_PASSWORD: ${CARGO_SMTP_PASSWORD:-}
+      CARGO_SMTP_FROM: ${CARGO_SMTP_FROM:-}
       WORDPRESS_DB_HOST: db
       WORDPRESS_DB_NAME: ${CARGO_DB_NAME:-cargo_staging}
       WORDPRESS_DB_USER: ${CARGO_DB_USER:-cargo_wp}
@@ -80,6 +87,8 @@ services:
       dockerfile: infra/php/go.Dockerfile
     environment:
       <<: *app-env
+      CARGO_TRACKING_ENABLED: ${CARGO_TRACKING_ENABLED:-0}
+      CARGO_TRACKING_KEY: ${CARGO_TRACKING_KEY:-}
       CARGO_GO_DB_USER: ${CARGO_GO_DB_USER:-cargo_go}
       CARGO_GO_DB_PASSWORD: ${CARGO_GO_DB_PASSWORD:?Fill .env go password}
     read_only: true

@@ -7,16 +7,24 @@ php tests/workspace_access.php
 php tests/workspace_urls.php
 php tests/site_policy.php
 php tests/public_generator.php
+php tests/email_login.php
+php tests/tracking.php
 php tests/partner_site.php
 php tests/qr_center.php
 node --check plugin/cargo-utm/assets/admin.js
 node --check plugin/cargo-utm/assets/ui/app.js
+node --check plugin/cargo-utm/assets/ui/auth.js
 node tests/draft.js
 node tests/online_preset.js
 node tests/short_links.js
 node tests/output_safety.js
+node tests/public_demo.js
+node tests/email_login_ui.js
+node --check go/tracker.js
+node tests/tracker.js
 python3 -m py_compile tests/qr_decode.py tests/http.py tests/ui_contract.py scripts/install-public-https.py tests/public_https.py
 python3 tests/ui_contract.py
+python3 tests/tracking_report.py
 python3 tests/public_https.py
 python3 -c 'import json; json.load(open("plugin/cargo-utm/composer.json")); print("Composer JSON: PASS")'
 # No daemon required. Placeholder values validate configuration only.

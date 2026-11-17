@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace CargoUTM;
 final class Schema {
-    public const VERSION=3;
+    public const VERSION=4;
     public static function migrate(): void {
         global $wpdb;
         require_once ABSPATH.'wp-admin/includes/upgrade.php';
@@ -14,6 +14,8 @@ final class Schema {
             'campaigns'=>"id bigint unsigned NOT NULL AUTO_INCREMENT, unit_id bigint unsigned NOT NULL, name varchar(200) NOT NULL, year smallint NOT NULL, utm_campaign varchar(120) NOT NULL, utm_id varchar(19) NOT NULL, starts_on date DEFAULT NULL, ends_on date DEFAULT NULL, status varchar(16) NOT NULL DEFAULT 'active', PRIMARY KEY  (id), UNIQUE KEY utm_campaign (utm_campaign), UNIQUE KEY utm_id (utm_id), KEY unit_id (unit_id)",
             'placements'=>"id bigint unsigned NOT NULL AUTO_INCREMENT, campaign_id bigint unsigned NOT NULL, unit_id bigint unsigned NOT NULL, type varchar(32) NOT NULL, event varchar(250) NOT NULL DEFAULT '', event_date date DEFAULT NULL, city varchar(250) NOT NULL DEFAULT '', object_code varchar(250) NOT NULL DEFAULT '', details_json longtext NOT NULL, tracking_json longtext DEFAULT NULL, original_url text NOT NULL, target_url text NOT NULL, short_code char(12) NOT NULL, utm_source varchar(80) NOT NULL, utm_medium varchar(80) NOT NULL, utm_campaign varchar(120) NOT NULL, utm_content varchar(160) NOT NULL DEFAULT '', utm_term varchar(160) NOT NULL DEFAULT '', utm_id varchar(19) NOT NULL, template_id bigint unsigned NOT NULL, brand_id bigint unsigned NOT NULL, rules_version int NOT NULL, qr_svg longtext NOT NULL, qr_hash char(64) NOT NULL, status varchar(16) NOT NULL DEFAULT 'active', author_id bigint unsigned NOT NULL, idempotency_key varchar(64) NOT NULL, request_hash char(64) NOT NULL, created_at datetime NOT NULL, PRIMARY KEY  (id), UNIQUE KEY short_code (short_code), UNIQUE KEY author_idempotency (author_id,idempotency_key), KEY campaign_id (campaign_id), KEY unit_status (unit_id,status), KEY type_date (type,event_date), KEY city (city(100)), KEY object_code (object_code(100)), KEY created_at (created_at)",
             'daily_hits'=>"placement_id bigint unsigned NOT NULL, day_utc date NOT NULL, get_count bigint unsigned NOT NULL DEFAULT 0, PRIMARY KEY  (placement_id,day_utc), KEY day_utc (day_utc)",
+            'visitor_state'=>"visitor_hash char(64) NOT NULL, identity_kind varchar(16) NOT NULL, session_id char(32) NOT NULL, last_seen datetime NOT NULL, PRIMARY KEY  (visitor_hash), KEY last_seen (last_seen)",
+            'visit_events'=>"event_id char(32) NOT NULL, placement_id bigint unsigned NOT NULL, occurred_at datetime NOT NULL, visitor_hash char(64) NOT NULL, identity_kind varchar(16) NOT NULL, session_id char(32) NOT NULL, fingerprint_hash char(64) NOT NULL, device varchar(16) NOT NULL, os varchar(16) NOT NULL, browser varchar(16) NOT NULL, PRIMARY KEY  (event_id), KEY placement_time (placement_id,occurred_at), KEY occurred_at (occurred_at), KEY visitor_time (visitor_hash,occurred_at), KEY session_id (session_id)",
             'audit'=>"id bigint unsigned NOT NULL AUTO_INCREMENT, placement_id bigint unsigned DEFAULT NULL, action varchar(40) NOT NULL, author_id bigint unsigned NOT NULL, reason text NOT NULL, old_json longtext NOT NULL, new_json longtext NOT NULL, created_at datetime NOT NULL, PRIMARY KEY  (id), KEY placement_id (placement_id), KEY created_at (created_at)",
         ];
         foreach ($tables as $name=>$definition) {

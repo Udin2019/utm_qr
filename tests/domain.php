@@ -33,6 +33,15 @@ foreach (Rules::REQUIRED as $type=>$fields) {
     $out=Rules::utm(['utm_campaign'=>'campaign','utm_id'=>'cg-1234567890abcdef'],$type,['place_slug'=>'entrance-a12'],$details,'9f4c21d6a8be');
     same('qr',$out['utm_medium'],'offline medium'); same('',$out['utm_term'],'offline term'); same('entrance-a12-p-9f4c21d6a8be',$out['utm_content'],'content');
 }
+$conference=['event'=>'Конференция','event_date'=>'2027-05-10','city'=>'Москва','object_code'=>'hall-a'];
+same('',Rules::details('conference',$conference)['speaker'],'conference speaker optional for existing inputs');
+same('Иван Петров',Rules::details('conference',$conference+['speaker'=>' Иван Петров '])['speaker'],'speaker stored and trimmed');
+same(str_repeat('Я',250),Rules::details('conference',$conference+['speaker'=>str_repeat('Я',250)])['speaker'],'speaker 250 character boundary');
+rejects(fn()=>Rules::details('conference',$conference+['speaker'=>str_repeat('Я',251)]),'speaker length');
+rejects(fn()=>Rules::details('conference',$conference+['speaker'=>"Иван\nПетров"]),'speaker control characters');
+same(false,in_array('speaker',Rules::VISIBLE['exhibition'],true),'speaker only for conference');
+$campaign=['utm_campaign'=>'conference-demo','utm_id'=>'cg-1234567890abcdef'];
+same(Rules::utm($campaign,'conference',[],$conference,'9f4c21d6a8be'),Rules::utm($campaign,'conference',[],$conference+['speaker'=>'Иван Петров'],'9f4c21d6a8be'),'speaker does not change UTM');
 foreach (['=1+1',' +SUM(A1)','@SUM(A1)',"\tcmd",'-2+2'] as $value) same("'".$value,Rules::csvCell($value),'CSV formula');
 same('https://fuel.cargo.example',Rules::csvCell('https://fuel.cargo.example'),'CSV URL');
 same(['code'=>'9f4c21d6a8be','utm'=>[]],Decoder::parse('https://go.cargo.test/r/9f4c21d6a8be','go.cargo.test'),'short decode');

@@ -20,6 +20,8 @@ add_action('plugins_loaded',static function(): void {
     if ((int)get_option('cargo_utm_schema_version')!==CargoUTM\Schema::VERSION) CargoUTM\Schema::migrate();
     (new CargoUTM\SitePolicy())->boot();
     (new CargoUTM\PublicGenerator())->boot();
+    (new CargoUTM\EmailLogin())->boot();
+    (new CargoUTM\VisitAnalytics())->boot();
     (new CargoUTM\Admin())->boot();
 });
 if (defined('WP_CLI') && WP_CLI) {

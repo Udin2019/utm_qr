@@ -97,7 +97,7 @@
       const values = state.details[type] ||= {};
       const overrides = {
         exhibition: { object_code: 'Идентификатор места QR (например, стенд A12)', surface: 'Носитель (например, стойка у входа)' },
-        conference: { object_code: 'Идентификатор места QR', surface: 'Носитель' },
+        conference: { object_code: 'Идентификатор места QR', surface: 'Носитель', speaker: 'Докладчик (необязательно)' },
         outdoor: { object_code: 'Код поверхности' },
         transport: { object_code: 'Код машины или группы', surface: 'Место на транспорте' },
         offline_point: { object_code: 'Код точки', zone: 'Зона размещения' },
@@ -169,7 +169,7 @@
     finally { state.saving = false; controls.forEach((el, i) => { el.disabled = disabled[i]; }); }
   }
   async function setView(view, focus = true) {
-    if (config.isGuest && view !== 'generator') { authenticate(view); return; }
+    if (config.isGuest && view !== 'generator') { showDemo(view, focus); return; }
     if (!config.canCreate && !config.isGuest && view === 'generator') view = 'register';
     const names = { generator: 'Генератор', register: 'Реестр', decode: 'Расшифровка' };
     root.querySelectorAll('main > section').forEach(el => { el.hidden = el.id !== 'view-' + view; });
@@ -177,6 +177,58 @@
     $('breadcrumb-current').textContent = names[view]; error($('workspace-error'));
     if (view === 'register') await registry();
     if (focus) $(view + '-title').focus({ preventScroll: true });
+  }
+  function demoTags(value) {
+    const url = new URL(value);
+    if (!['https:', 'http:'].includes(url.protocol)) throw new Error('Введите HTTP или HTTPS ссылку с UTM-метками.');
+    return Object.fromEntries([...url.searchParams].filter(([key]) => ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'utm_id'].includes(key)));
+  }
+  function showDemo(view, focus = true) {
+    const names = { register: 'Реестр', decode: 'Расшифровка', analytics: 'Переходы · UTC', settings: 'Справочники' };
+    if (!Object.hasOwn(names, view)) return;
+    let section = $('view-demo');
+    if (!section) { section = node('section', undefined, 'single-view'); section.id = 'view-demo'; section.setAttribute('aria-labelledby', 'demo-title'); root.querySelector('main').append(section); }
+    root.querySelectorAll('main > section').forEach(el => { el.hidden = el !== section; });
+    root.querySelectorAll('.nav-item[data-view]').forEach(el => { const on = el.dataset.view === view; el.classList.toggle('is-active', on); if (on) el.setAttribute('aria-current', 'page'); else el.removeAttribute('aria-current'); });
+    $('breadcrumb-current').textContent = names[view]; error($('workspace-error'));
+    const heading = node('header', undefined, 'page-heading'); const title = node('h1', names[view]); title.id = 'demo-title'; title.tabIndex = -1;
+    heading.append(title, node('p', 'Демонстрационный режим · Все примеры вымышлены. Изменения, экспорт и выпуск QR доступны после входа.'));
+    const card = node('div', undefined, 'card'); section.replaceChildren(heading, card);
+    function table(headers, rows) {
+      const wrap = node('div', undefined, 'table-wrap'); const el = node('table'); const head = node('thead'); const tr = node('tr');
+      headers.forEach(text => { const th = node('th', text); th.scope = 'col'; tr.append(th); }); head.append(tr);
+      const body = node('tbody'); rows.forEach(values => { const row = node('tr'); values.forEach(text => row.append(node('td', String(text)))); body.append(row); });
+      el.append(head, body); wrap.append(el); card.append(wrap);
+    }
+    if (view === 'register') table(['Кампания', 'Носитель', 'Бизнес-юнит', 'Статус', 'Переходы'], [
+      ['Демо: выставка', 'Выставки', 'Демо-юнит', 'Активно', 42],
+      ['Демо: партнёрский сайт', 'Онлайн', 'Демо-юнит', 'Активно', 18],
+      ['Демо: печатное издание', 'Печатные издания', 'Демо-юнит', 'В архиве', 7],
+    ]);
+    if (view === 'analytics') {
+      card.append(node('p', 'Вымышленный пример: 67 переходов, 52 визита и 36 посетителей по cookie за период. Визит заканчивается после 30 минут без обращений к трекеру. Посетители по дням могут повторяться, поэтому дневные уникальные не суммируются. Это не показатели работающего сайта.', 'card-body'));
+      table(['Дата · UTC', 'Переходы GET', 'Визиты (cookie)', 'Посетители (cookie)', 'Без cookie, оценка посетителей'], [
+        ['2026-01-01', 19, 15, 12, 2], ['2026-01-02', 26, 20, 16, 3], ['2026-01-03', 22, 17, 14, 2],
+      ]);
+    }
+    if (view === 'settings') {
+      table(['Справочник', 'Пример', 'Параметры'], [
+        ['Бизнес-юниты', 'Демо-юнит', 'demo'], ['Кампании', 'Демо: выставка', 'demo-expo'],
+        ['Профили QR', 'Демонстрационный профиль', 'Пример, не утверждён для печати'],
+        ['Онлайн-пресеты', 'Сайт партнёра', 'utm_source=partner.example · utm_medium=referral'],
+      ]);
+      card.append(node('p', 'Добавление и редактирование справочников доступны администратору после входа.', 'card-body'));
+    }
+    if (view === 'decode') {
+      const form = node('form', undefined, 'card-body decode-form'); const label = node('label'); const input = node('input'); input.type = 'url'; input.required = true;
+      input.value = 'https://landing.example/?utm_source=partner.example&utm_medium=referral&utm_campaign=demo';
+      label.append(node('span', 'UTM-ссылка'), input); const submit = node('button', 'Расшифровать', 'button primary'); submit.type = 'submit';
+      const result = node('div', undefined, 'card-body'); result.setAttribute('aria-live', 'polite');
+      form.append(label, submit); card.append(node('p', 'Локальный разбор ссылки без обращения к базе. Поиск размещений по короткому коду доступен после входа.', 'card-body'), form, result);
+      const parse = () => { try { const tags = demoTags(input.value); result.replaceChildren(Object.keys(tags).length ? tagGrid(tags) : node('p', 'В ссылке нет UTM-меток.')); } catch { result.replaceChildren(node('p', 'Введите корректную HTTP или HTTPS ссылку.')); } };
+      form.addEventListener('submit', event => { event.preventDefault(); parse(); }); parse();
+    }
+    if (focus) title.focus({ preventScroll: true });
   }
   function filters() { return { q: $('registry-search').value, type: $('registry-filter').value, unit_id: $('filter-unit').value, campaign_id: $('filter-campaign').value, status: $('filter-status').value, city: $('filter-city').value, utm_medium: $('filter-medium').value, from: $('filter-from').value, to: $('filter-to').value, page: state.page }; }
   async function registry() {
@@ -275,6 +327,7 @@
     catch { notify('Черновик не удалось сохранить в браузере. Скопируйте UTM-ссылку перед входом.'); }
     const target = new URL(destination || config.links.home);
     if (!destination && view !== 'generator') target.searchParams.set('tab', view === 'register' ? 'registry' : view);
+    if (config.emailLogin) { window.dispatchEvent(new CustomEvent('cargo-login', { detail: { target: target.href } })); return; }
     const login = new URL(config.links.login); login.searchParams.set('redirect_to', target.href);
     window.location.assign(login.href);
   }
@@ -345,7 +398,9 @@
     root.querySelector('.environment').hidden = config.production;
     const nav = root.querySelector('.navigation');
     if (config.isGuest) {
-      nav.append(button('Переходы · UTC', () => authenticate('generator', config.links.analytics), 'nav-item'), button('Справочники', () => authenticate('generator', config.links.settings), 'nav-item'));
+      for (const [view, title] of [['analytics', 'Переходы · UTC'], ['settings', 'Справочники']]) {
+        const item = button(title, () => {}, 'nav-item'); item.dataset.view = view; nav.append(item);
+      }
     } else {
       nav.append(link('Переходы · UTC', config.links.analytics));
       if (config.canManage) nav.append(link('Справочники', config.links.settings));

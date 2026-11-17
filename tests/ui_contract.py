@@ -41,7 +41,7 @@ assert any(tag == 'a' and attrs.get('id') == 'generator-home' for tag, attrs in 
 assert page.carriers == {'exhibition', 'conference', 'outdoor', 'transport', 'offline_point', 'print_media'}
 js = (assets / 'app.js').read_text()
 static_ids = set(page.ids) | {'cargo-app', 'cargo-config'}
-dynamic_ids = {'roistat-hint', 'export-hits'}
+dynamic_ids = {'roistat-hint', 'export-hits', 'view-demo'}
 for used in re.findall(r"\$\('([^']+)'\)", js):
     assert used in static_ids | dynamic_ids or used.startswith('field-'), f'Missing HTML target: {used}'
 assert 'localStorage' not in js and 'buildQr' not in js and 'qrcodegen' not in js

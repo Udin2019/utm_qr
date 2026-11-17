@@ -170,7 +170,7 @@ final class Admin {
         if (!current_user_can('cargo_export')) return;
         $args=array_intersect_key($_GET,array_flip(['q','unit_id','campaign_id','type','status','city','medium','from','to']));
         $url=wp_nonce_url(add_query_arg(['action'=>'cargo_csv','kind'=>$kind]+$args,admin_url('admin-post.php')),'cargo_csv');
-        echo '<a class="button" href="'.esc_url($url).'">CSV · '.($kind==='hits'?'Переходы по дням (UTC)':'Размещения').'</a> ';
+        echo '<a class="button" href="'.esc_url($url).'">CSV · '.($kind==='hits'?'Переходы по дням (UTC)':($kind==='visits'?'Визиты и посетители за период':'Размещения')).'</a> ';
     }
     private function registry(): void {
         global $wpdb; $this->filterForm('registry'); $this->csvLink('placements'); $this->csvLink('hits');
@@ -249,9 +249,39 @@ final class Admin {
         foreach (['from'=>'>=','to'=>'<='] as $k=>$op) if (!empty($_GET[$k])) $where.=$wpdb->prepare(" AND h.day_utc $op %s",Rules::date((string)$_GET[$k]));
         return ' FROM '.$this->store->table('daily_hits').' h JOIN '.$this->store->table('placements').' p ON p.id=h.placement_id JOIN '.$this->store->table('campaigns').' c ON c.id=p.campaign_id JOIN '.$this->store->table('units').' u ON u.id=p.unit_id WHERE '.$where;
     }
+    private function visitsQuery(): string {
+        global $wpdb;
+        $copy=$_GET; unset($_GET['from'],$_GET['to']);
+        try { [$where]=$this->filters(); } finally { $_GET=$copy; }
+        foreach (['from'=>'>=','to'=>'<='] as $k=>$op) if (!empty($_GET[$k])) $where.=$wpdb->prepare(" AND e.occurred_at $op %s",Rules::date((string)$_GET[$k]).($k==='from'?' 00:00:00':' 23:59:59'));
+        return ' FROM '.$this->store->table('visit_events').' e JOIN '.$this->store->table('placements').' p ON p.id=e.placement_id JOIN '.$this->store->table('campaigns').' c ON c.id=p.campaign_id JOIN '.$this->store->table('units').' u ON u.id=p.unit_id WHERE '.$where;
+    }
+    private function visitsReport(): void {
+        global $wpdb; $query=$this->visitsQuery();
+        echo '<h3>Визиты и посетители за выбранный период · UTC</h3><p>Визит — обращения к трекеру с перерывами менее 30 минут. Посетитель — браузер с cookie, а не отдельный человек. Без cookie fingerprint даёт отдельную оценку. Загрузка целевого сайта не подтверждается. События доступны за последние 180 дней; очистка выполняется пакетами.</p>';
+        $summary=$wpdb->get_row('SELECT '.VisitAnalytics::select().$query,ARRAY_A)?:[];
+        echo '<dl>';
+        foreach (VisitAnalytics::columns() as $key=>$label) echo '<dt>'.self::e($label).'</dt><dd>'.self::e((int)($summary[$key]??0)).'</dd>';
+        echo '</dl><p>Общие уникальные показатели рассчитаны по всему периоду. Один визит может затронуть несколько размещений, поэтому показатели строк не суммируются.</p>';
+        $this->csvLink('visits');
+        $page=max(1,(int)($_GET['visits_page']??1));
+        $rows=$wpdb->get_results($wpdb->prepare('SELECT p.id,p.short_code,c.name campaign,u.name unit,'.VisitAnalytics::select().$query.' GROUP BY p.id,p.short_code,c.name,u.name ORDER BY p.id DESC LIMIT 100 OFFSET %d',($page-1)*100),ARRAY_A);
+        $count=(int)$wpdb->get_var('SELECT COUNT(DISTINCT p.id)'.$query);
+        echo '<table class="widefat striped"><tr><th>Размещение</th><th>Бизнес-юнит / кампания</th>';
+        foreach (VisitAnalytics::columns() as $label) echo '<th>'.self::e($label).'</th>';
+        echo '</tr>';
+        foreach ($rows as $r) {
+            echo '<tr><td>'.self::e($r['short_code']).'</td><td>'.self::e($r['unit'].' / '.$r['campaign']).'</td>';
+            foreach (VisitAnalytics::columns() as $key=>$label) echo '<td>'.self::e((int)$r[$key]).'</td>';
+            echo '</tr>';
+        }
+        echo '</table>'.wp_kses_post(paginate_links(['base'=>add_query_arg('visits_page','%#%'),'total'=>(int)ceil($count/100),'current'=>$page]));
+    }
     private function analytics(): void {
         global $wpdb; echo '<h2>Переходы через короткую ссылку (GET)</h2><p>Суточная агрегация в UTC. Включает повторы, роботов и предпросмотры. Визиты и конверсии измеряются на лендинге.</p>';
         $this->filterForm('analytics'); $this->csvLink('hits');
+        $this->visitsReport();
+        echo '<h3>Переходы GET по дням</h3>';
         $page=max(1,(int)($_GET['paged']??1)); $query=$this->hitsQuery();
         $rows=$wpdb->get_results($wpdb->prepare('SELECT h.*,p.short_code,c.name campaign,u.name unit'.$query.' ORDER BY h.day_utc DESC,h.placement_id DESC LIMIT 100 OFFSET %d',($page-1)*100),ARRAY_A);
         $count=(int)$wpdb->get_var('SELECT COUNT(*)'.$query);
@@ -263,8 +293,11 @@ final class Admin {
         $this->cap('cargo_export'); check_admin_referer('cargo_csv'); global $wpdb;
         try {
             $kind=(string)($_GET['kind']??'');
-            if (!in_array($kind,['hits','placements'],true)) throw new \InvalidArgumentException('Неизвестная выгрузка.');
-            if ($kind==='hits') {
+            if (!in_array($kind,['hits','placements','visits'],true)) throw new \InvalidArgumentException('Неизвестная выгрузка.');
+            if ($kind==='visits') {
+                $columns=['placement_id'=>'ID размещения','short_code'=>'Код','campaign'=>'Кампания','unit'=>'Бизнес-юнит']+VisitAnalytics::columns();
+                $query='SELECT p.id placement_id,p.short_code,c.name campaign,u.name unit,'.VisitAnalytics::select().$this->visitsQuery().' GROUP BY p.id,p.short_code,c.name,u.name ORDER BY p.id';
+            } elseif ($kind==='hits') {
                 $columns=['placement_id'=>'ID размещения','day_utc'=>'Дата UTC','get_count'=>'Переходы через короткую ссылку (GET)'];
                 $query='SELECT h.placement_id,h.day_utc,h.get_count'.$this->hitsQuery().' ORDER BY h.day_utc,h.placement_id';
             } else {

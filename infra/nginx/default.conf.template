@@ -87,5 +87,17 @@ server {
         fastcgi_no_cache 1;
         fastcgi_cache_bypass 1;
     }
+    location = /collect {
+        limit_req zone=cargo_go burst=20 nodelay;
+        client_max_body_size 4k;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /opt/cargo/go/collect.php;
+        fastcgi_param HTTP_HOST ${CARGO_GO_HOST};
+        fastcgi_param HTTPS on;
+        fastcgi_param QUERY_STRING "";
+        fastcgi_param HTTP_AUTHORIZATION "";
+        fastcgi_pass go:9000;
+        fastcgi_read_timeout 8s;
+    }
     location / { return 404; }
 }
