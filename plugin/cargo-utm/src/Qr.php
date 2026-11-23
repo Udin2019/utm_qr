@@ -23,11 +23,8 @@ final class Qr {
         $vb = $asset['viewBox'] ?? [];
         if (count($vb)!==4 || array_filter($vb,fn($v)=>!is_numeric($v) || !is_finite((float)$v) || abs((float)$v)>10000) || $vb[2]<=0 || $vb[3]<=0) throw new \InvalidArgumentException('Неверный viewBox.');
         $layout=self::centeredMatrix($url);
-        $data=$layout['data']; $n=count($data); $window=$layout['window'];
-        [$wx,$wy,$size]=$window; $total=$n+8; $d='';
-        foreach ($data as $y=>$row) foreach ($row as $x=>$module) {
-            if (($module & QRMatrix::IS_DARK)!==0) $d.='M'.($x+4).' '.($y+4).'h1v1h-1z';
-        }
+        $data=$layout['data']; $n=count($data);
+        $total=$n+8; $d=self::modulePath($data);
         $logoBox=implode(' ',array_map(fn($v)=>(string)(float)$v,$vb));
         $center=$total/2; $logoSize=$layout['logo_size']; $plateSize=$layout['plate_size'];
         $logoStart=$center-$logoSize/2; $plateStart=$center-$plateSize/2;
@@ -35,6 +32,21 @@ final class Qr {
         // remain untouched, including partial data cells on the plate boundary.
         return '<svg xmlns="http://www.w3.org/2000/svg" width="'.$total.'" height="'.$total.'" viewBox="0 0 '.$total.' '.$total.'"><rect width="100%" height="100%" fill="#fff"/><path fill="#111111" shape-rendering="crispEdges" d="'.$d.'"/><rect data-role="logo-plate" x="'.$plateStart.'" y="'.$plateStart.'" width="'.$plateSize.'" height="'.$plateSize.'" fill="#fff"/><svg x="'.$logoStart.'" y="'.$logoStart.'" width="'.$logoSize.'" height="'.$logoSize.'" viewBox="'.$logoBox.'" preserveAspectRatio="xMidYMid meet" overflow="hidden"><g fill="'.$color.'">'.$logo.'</g></svg></svg>';
 
+    }
+
+    public static function plainSvg(string $url): string {
+        $qr=new QRCode(new QROptions(['eccLevel'=>EccLevel::M,'addQuietzone'=>false]));
+        $matrix=$qr->addByteSegment($url)->getQRMatrix()->getMatrix();
+        $total=count($matrix)+8;
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="'.$total.'" height="'.$total.'" viewBox="0 0 '.$total.' '.$total.'"><rect width="100%" height="100%" fill="#fff"/><path fill="#111111" shape-rendering="crispEdges" d="'.self::modulePath($matrix).'"/></svg>';
+    }
+
+    private static function modulePath(array $matrix): string {
+        $path='';
+        foreach ($matrix as $y=>$row) foreach ($row as $x=>$module) {
+            if (($module & QRMatrix::IS_DARK)!==0) $path.='M'.($x+4).' '.($y+4).'h1v1h-1z';
+        }
+        return $path;
     }
 
     /** Select a strictly centered data-only window, increasing QR version if needed. */

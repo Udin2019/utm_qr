@@ -79,4 +79,4 @@ foreach ($cases as [$case,$expected]) {
         if ($config['nonce']!==$action.'-nonce' || ($expected['guest'] && !str_ends_with($config['endpoint'],'?action='.$action))) throw new RuntimeException('Endpoint isolation');
     } elseif ($code!==0 || json_decode($out,true)!==$expected) throw new RuntimeException('Entry policy: '.$out.' '.$error);
 }
-echo "PASS: site noindex headers/meta/robots and 10 entry/login/permission cases\n";
+echo "PASS: site noindex headers/meta/robots and 11 entry/login/permission cases\n";

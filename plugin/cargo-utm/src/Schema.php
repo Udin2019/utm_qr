@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace CargoUTM;
 final class Schema {
-    public const VERSION=4;
+    public const VERSION=5;
     public static function migrate(): void {
         global $wpdb;
         require_once ABSPATH.'wp-admin/includes/upgrade.php';
@@ -18,7 +18,7 @@ final class Schema {
             'visit_events'=>"event_id char(32) NOT NULL, placement_id bigint unsigned NOT NULL, occurred_at datetime NOT NULL, visitor_hash char(64) NOT NULL, identity_kind varchar(16) NOT NULL, session_id char(32) NOT NULL, fingerprint_hash char(64) NOT NULL, device varchar(16) NOT NULL, os varchar(16) NOT NULL, browser varchar(16) NOT NULL, PRIMARY KEY  (event_id), KEY placement_time (placement_id,occurred_at), KEY occurred_at (occurred_at), KEY visitor_time (visitor_hash,occurred_at), KEY session_id (session_id)",
             'audit'=>"id bigint unsigned NOT NULL AUTO_INCREMENT, placement_id bigint unsigned DEFAULT NULL, action varchar(40) NOT NULL, author_id bigint unsigned NOT NULL, reason text NOT NULL, old_json longtext NOT NULL, new_json longtext NOT NULL, created_at datetime NOT NULL, PRIMARY KEY  (id), KEY placement_id (placement_id), KEY created_at (created_at)",
         ];
-        foreach ($tables as $name=>$definition) {
+        foreach ($tables+BusinessCardsStore::tables() as $name=>$definition) {
             $definition=str_replace(', ',",\n",$definition);
             dbDelta("CREATE TABLE {$p}{$name} (\n{$definition}\n) {$cc};");
             $engine=$wpdb->get_var($wpdb->prepare('SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=%s',$p.$name));
@@ -27,6 +27,11 @@ final class Schema {
         $indexes=$wpdb->get_results("SHOW INDEX FROM {$p}placements",ARRAY_A);
         $names=array_column($indexes,'Key_name');
         foreach (['short_code','author_idempotency'] as $index) if (!in_array($index,$names,true)) throw new \RuntimeException('Не создан индекс '.$index);
+        foreach (['profiles'=>['owner','slug'],'sessions'=>['token_hash'],'leads'=>['session_id','profile_submission']] as $table=>$unique) {
+            $indexes=$wpdb->get_results("SHOW INDEX FROM {$p}cards_{$table}",ARRAY_A);
+            $names=array_column(array_filter($indexes,static fn(array $index): bool=>(int)$index['Non_unique']===0),'Key_name');
+            foreach ($unique as $index) if (!in_array($index,$names,true)) throw new \RuntimeException('Не создан уникальный индекс визиток '.$index);
+        }
         $columns=$wpdb->get_col("SHOW COLUMNS FROM {$p}placements");
         if (!in_array('tracking_json',$columns,true)) throw new \RuntimeException('Не создан снимок tracking_json.');
         self::uiDefaults();

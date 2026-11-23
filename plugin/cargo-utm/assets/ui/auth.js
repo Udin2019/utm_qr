@@ -72,13 +72,19 @@
     challenge = ''; code.value = ''; code.disabled = true; code.required = false; codeLabel.hidden = true;
     email.readOnly = false; resend.hidden = true; change.hidden = true; submit.textContent = 'Получить код'; status.textContent = ''; failure.hidden = true; email.focus();
   });
-  window.addEventListener('cargo-login', event => {
-    const url = new URL(event.detail?.target || config.links.home, window.location.href);
+  function openLogin(destination) {
+    const url = new URL(destination || config.links.home, window.location.href);
     const home = new URL(config.links.home);
     // Login always returns to this service, never to a supplied outside host.
     target = url.origin === home.origin ? url.href : home.href;
     if (!config.emailLogin.ready) status.textContent = 'Отправка кодов ещё не настроена. Обратитесь к администратору.';
-    refresh(); if (!dialog.open) dialog.showModal();
-  });
+    refresh();
+    if (!dialog.open) dialog.showModal();
+  }
+  window.addEventListener('cargo-login', event => openLogin(event.detail?.target));
+  if (config.links.loginTarget) {
+    document.getElementById('cargo-card-login')?.addEventListener('click', () => openLogin(config.links.loginTarget));
+    if (config.emailLogin.ready) openLogin(config.links.loginTarget);
+  }
   setInterval(() => { if (dialog.open) refresh(); }, 1000);
 })();

@@ -13,10 +13,10 @@ class Element {
   reportValidity() { return true; }
   focus() {}
 }
-async function browser(ready) {
+async function browser(ready, loginTarget) {
   const root = new Element('root');
   const handlers = {}; const requests = []; const redirects = [];
-  const config = { isGuest: true, emailLogin: { ready, nonce: 'test', endpoint: '/wp-admin/admin-ajax.php?action=cargo_email_login' }, links: { home: 'https://utmqr.kit-rb.com/' } };
+  const config = { isGuest: true, emailLogin: { ready, nonce: 'test', endpoint: '/wp-admin/admin-ajax.php?action=cargo_email_login' }, links: { home: 'https://utmqr.kit-rb.com/', loginTarget } };
   root.querySelector = () => ({ textContent: JSON.stringify(config) });
   const ctx = {
     document: { getElementById: () => root, createElement: tag => new Element(tag) },
@@ -46,6 +46,15 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   app.code.value = '012345'; app.form.handlers.submit({ preventDefault() {} }); await tick();
   assert.equal(app.requests[1].code, '012345'); assert.equal(app.requests[1].challenge, 'test-challenge');
   assert.equal(app.redirects[0], 'https://utmqr.kit-rb.com/');
+  const cardsUrl = 'https://utmqr.kit-rb.com/business-cards';
+  const cards = await browser(true, cardsUrl);
+  assert.equal(cards.dialog.open, true);
+  assert.equal(cards.requests.length, 0);
+  cards.email.value = 'person@cargonomica.com';
+  cards.form.handlers.submit({ preventDefault() {} }); await tick();
+  cards.code.value = '012345';
+  cards.form.handlers.submit({ preventDefault() {} }); await tick();
+  assert.equal(cards.redirects[0], cardsUrl);
   assert.ok(!/innerHTML|console\.|localStorage|sessionStorage/.test(source));
   console.log('PASS: disabled login UI, request/verify flow, leading-zero OTP and outside redirect blocked');
 })().catch(error => { console.error(error); process.exitCode = 1; });

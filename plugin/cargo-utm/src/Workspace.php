@@ -8,8 +8,10 @@ final class Workspace {
     public function boot(): void { add_action('wp_ajax_cargo_workspace',[$this,'api']); }
     public function render(bool $guest=false): void {
         $authBase=dirname(__DIR__).'/cargo-utm.php';
-        wp_enqueue_script('cargo-email-login',plugins_url('assets/ui/auth.js',$authBase),['cargo-workspace'],(string)filemtime(dirname(__DIR__).'/assets/ui/auth.js'),true);
+        wp_enqueue_script('cargo-email-login',plugins_url('assets/ui/auth.js',$authBase),[],(string)filemtime(dirname(__DIR__).'/assets/ui/auth.js'),true);
         $config=['emailLogin'=>['endpoint'=>admin_url('admin-ajax.php?action=cargo_email_login'),'nonce'=>wp_create_nonce('cargo_email_login'),'ready'=>LoginMail::ready()],'shortLinksEnabled'=>Config::shortLinksEnabled(),'isGuest'=>$guest,'endpoint'=>$guest?admin_url('admin-ajax.php?action=cargo_public_generator'):admin_url('admin-ajax.php'),'nonce'=>wp_create_nonce($guest?'cargo_public_generator':'cargo_workspace'),'canCreate'=>current_user_can('cargo_create'),'canExport'=>current_user_can('cargo_export'),'canManage'=>current_user_can('cargo_manage'),'production'=>Config::production(),'initialView'=>($_GET['tab']??'')==='registry'?'register':(($_GET['tab']??'')==='decode'?'decode':'generator'),'initialRecord'=>max(0,(int)($_GET['view']??0)),'duplicate'=>max(0,(int)($_GET['duplicate']??0)),'links'=>['home'=>home_url('/'),'login'=>wp_login_url(home_url('/')),'logout'=>html_entity_decode(wp_logout_url(home_url('/')),ENT_QUOTES,'UTF-8'),'analytics'=>admin_url('admin.php?page=cargo-utm&tab=analytics'),'settings'=>admin_url('admin.php?page=cargo-utm&tab=settings')]];
+        if (!$guest && ($config['canCreate'] || $config['canManage'])) $config['links']['cards']=home_url('/business-cards');
+        if ($guest && ($_GET['login']??null)==='business-cards') $config['links']['loginTarget']=home_url('/business-cards');
         echo '<div class="cargo-app" id="cargo-app"><script type="application/json" id="cargo-config">'.wp_json_encode($config,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT).'</script>';
         require dirname(__DIR__).'/views/workspace.php';
         echo '</div>';

@@ -333,9 +333,9 @@
   }
   function setupGuestFields() {
     const account = node('div', undefined, 'account-actions');
-    if (config.isGuest) account.append(button('Войти', () => authenticate()));
-    else account.append(link('Выйти', config.links.logout));
-    root.querySelector('.topbar').append(account);
+    if (config.isGuest && !config.links.loginTarget) account.append(button('Войти', () => authenticate()));
+    if (!config.isGuest) account.append(link('Выйти', config.links.logout));
+    if (!config.isGuest || !config.links.loginTarget) root.querySelector('.topbar').append(account);
     $('guest-campaign-fields').hidden = !config.isGuest;
     $('saved-campaign-field').hidden = Boolean(config.isGuest);
     $('campaign').disabled = Boolean(config.isGuest);
@@ -404,6 +404,17 @@
     } else {
       nav.append(link('Переходы · UTC', config.links.analytics));
       if (config.canManage) nav.append(link('Справочники', config.links.settings));
+      if (config.links.cards) {
+        const cards = link('Обмен визиток', config.links.cards);
+        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+        icon.setAttribute('class', 'icon');
+        icon.setAttribute('aria-hidden', 'true');
+        use.setAttribute('href', '#i-scan');
+        icon.append(use);
+        cards.prepend(icon);
+        nav.append(cards);
+      }
     }
     nav.querySelectorAll('a').forEach(a => { a.className = 'nav-item'; });
     if (!config.canCreate && !config.isGuest) root.querySelectorAll('[data-view=generator],#new-placement,#create-campaign').forEach(el => { el.hidden = true; });

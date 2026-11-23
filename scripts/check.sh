@@ -6,6 +6,8 @@ php tests/domain.php
 php tests/workspace_access.php
 php tests/workspace_urls.php
 php tests/site_policy.php
+php tests/business_cards.php
+php tests/business_cards_routes.php
 php tests/public_generator.php
 php tests/email_login.php
 php tests/tracking.php
@@ -13,6 +15,8 @@ php tests/partner_site.php
 php tests/qr_center.php
 node --check plugin/cargo-utm/assets/admin.js
 node --check plugin/cargo-utm/assets/ui/app.js
+node --check plugin/cargo-utm/assets/ui/cards.js
+node tests/business_cards_ui.js
 node --check plugin/cargo-utm/assets/ui/auth.js
 node tests/draft.js
 node tests/online_preset.js

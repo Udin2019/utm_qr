@@ -44,6 +44,15 @@
       <header class="topbar">
         <div class="breadcrumbs"><span>Маркетинг</span><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg><span id="breadcrumb-current">Генератор</span></div>
         <span class="environment"><span aria-hidden="true"></span>Тестовый стенд</span>
+        <?php if (isset($config['links']['loginTarget'])): ?>
+          <div class="account-actions">
+            <button class="button primary" id="cargo-card-login" type="button">Войти для обмена визитками</button>
+            <?php if (!$config['emailLogin']['ready']): ?>
+              <a class="button outline" href="<?php echo esc_url(wp_login_url($config['links']['loginTarget'])); ?>">Войти с паролем</a>
+            <?php endif; ?>
+            <noscript>Для входа по коду включите JavaScript.</noscript>
+          </div>
+        <?php endif; ?>
       </header>
 
       <main class="main"><p id="workspace-error" class="form-error" role="alert" hidden></p><noscript><p class="form-error">Для интерактивного интерфейса включите JavaScript.</p></noscript>

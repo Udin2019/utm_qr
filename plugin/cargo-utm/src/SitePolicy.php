@@ -47,6 +47,8 @@ final class SitePolicy {
 
     public function afterLogin(string $redirect,string $requested,mixed $user): string {
         if (!$user instanceof \WP_User || !$user->has_cap('cargo_view')) return $redirect;
+        $cards=home_url('/business-cards');
+        if (rtrim($requested,'/')===$cards) return $cards;
         $host=parse_url($requested,PHP_URL_HOST);
         if ($requested==='' || $host===Config::hosts()[0] || rtrim($requested,'/')===rtrim(home_url('/'),'/')) {
             return home_url('/');

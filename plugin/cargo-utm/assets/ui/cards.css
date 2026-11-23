@@ -1,0 +1,32 @@
+.bc-root { min-height: 100vh; overflow-wrap: anywhere; }
+.bc-root [hidden] { display: none !important; }
+.bc-main { display: grid; gap: 1rem; min-width: 0; }
+.bc-panel { display: grid; gap: .85rem; border: 1px solid #44515c; border-radius: 1rem; background: #17232c; color: #eef3f5; padding: clamp(.9rem, 4vw, 2rem); }
+.bc-panel h1, .bc-panel h2, .bc-panel h3, .bc-panel p, .bc-panel ul { margin: 0; }
+.bc-panel a { color: #9de8dc; }
+.bc-guest { width: min(100% - 1rem, 42rem); margin: max(1rem, env(safe-area-inset-top)) auto max(1rem, env(safe-area-inset-bottom)); }
+.bc-logo { max-width: 100%; object-fit: contain; }
+.bc-root form { display: grid; gap: .85rem; max-width: 42rem; }
+.bc-root label { display: grid; gap: .28rem; }
+.bc-root input:not([type=checkbox]), .bc-root select { width: 100%; min-width: 0; min-height: 44px; padding: .5rem; font: inherit; font-size: 16px; color: #19232b; background: #fbfcfd; border: 1px solid #7b8e9a; border-radius: .4rem; color-scheme: light; }
+.bc-root .bc-check { display: flex; align-items: center; min-height: 44px; gap: .65rem; }
+.bc-check input { width: 1.2rem; height: 1.2rem; flex-shrink: 0; }
+.bc-actions { display: flex; gap: .55rem; flex-wrap: wrap; margin-block: .4rem; }
+.bc-root button:not(.nav-item), .bc-panel .bc-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; border: 1px solid #72dbc9; border-radius: .45rem; padding: .5rem .85rem; background: #b1eee3; color: #10252a; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
+.bc-root button[aria-pressed=true] { background: #123b36; color: white; }
+.bc-root button:disabled { opacity: .55; cursor: wait; }
+.bc-root :focus-visible { outline: 3px solid #f0ae55; outline-offset: 2px; }
+.bc-root summary { min-height: 44px; cursor: pointer; padding-block: .6rem; }
+.bc-document { white-space: pre-wrap; }
+.bc-warning { background: #ffe6ad; color: #342400; border-radius: .5rem; padding: .7rem; }
+.bc-qr { width: min(100%, 320px); height: auto; display: block; margin-block: .8rem; }
+.bc-list { list-style: none; padding: 0; display: grid; gap: .55rem; }
+.bc-list li, #bc-lead-detail { padding: .7rem; border: 1px solid #657884; border-radius: .45rem; }
+.bc-topbar { justify-content: space-between; }
+@media (max-width: 720px) {
+  .bc-shell { display: block; }
+  .bc-shell .bc-sidebar { position: static; width: auto; height: auto; display: block; padding: .65rem; }
+  .bc-sidebar .navigation { display: flex; flex-wrap: wrap; gap: .25rem; width: auto; }
+  .bc-sidebar .nav-item { min-height: 44px; }
+  .bc-main { padding-left: max(.65rem, env(safe-area-inset-left)); padding-right: max(.65rem, env(safe-area-inset-right)); padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+}

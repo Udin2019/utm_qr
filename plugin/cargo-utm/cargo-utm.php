@@ -19,6 +19,7 @@ register_activation_hook(__FILE__,[CargoUTM\Schema::class,'migrate']);
 add_action('plugins_loaded',static function(): void {
     if ((int)get_option('cargo_utm_schema_version')!==CargoUTM\Schema::VERSION) CargoUTM\Schema::migrate();
     (new CargoUTM\SitePolicy())->boot();
+    (new CargoUTM\BusinessCards())->boot();
     (new CargoUTM\PublicGenerator())->boot();
     (new CargoUTM\EmailLogin())->boot();
     (new CargoUTM\VisitAnalytics())->boot();
